@@ -126,9 +126,10 @@ static void handle_rules_delete(struct mg_connection *conn, server_ctx_t *srv) {
     mg_get_var(qs, strlen(qs), "id", val, sizeof val);
     int id = atoi(val);
     pthread_mutex_lock(&srv->lock);
-    router_remove_rule(&srv->router, id);
+    int rc = router_remove_rule(&srv->router, id);
     pthread_mutex_unlock(&srv->lock);
-    send_json(conn, 200, "{\"ok\":true}");
+    if (rc != 0) send_json(conn, 404, "{\"error\":\"not found\"}");
+    else send_json(conn, 200, "{\"ok\":true}");
 }
 
 static void handle_sessions(struct mg_connection *conn, server_ctx_t *srv) {

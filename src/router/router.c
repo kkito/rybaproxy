@@ -11,6 +11,7 @@ void router_init(router_t *r, const char *def, bool fallback) {
     if (def) snprintf(r->default_upstream, sizeof r->default_upstream, "%s", def);
     else strcpy(r->default_upstream, "direct");
     r->fallback_to_direct = fallback;
+    r->next_rule_id = 1;
 }
 
 void router_free(router_t *r) {
