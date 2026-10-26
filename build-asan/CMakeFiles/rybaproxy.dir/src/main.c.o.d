@@ -168,9 +168,17 @@ CMakeFiles/rybaproxy.dir/src/main.c.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/netinet6/in6.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/errno.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/errno.h \
-  /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/stats.h \
   /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/session.h \
   /Users/kkito/proj/demo/rybaproxy/build-asan/vcpkg_installed/arm64-osx/include/event2/bufferevent.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread/sched.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread/pthread_impl.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread/qos.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/qos.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_mach_port_t.h \
+  /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/stats.h \
+  /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/db.h \
+  /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/web.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/signal.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/string.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/_string.h \

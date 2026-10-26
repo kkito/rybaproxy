@@ -114,10 +114,24 @@ CMakeFiles/rybaproxy_core.dir/src/core/log.c.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/rybaproxy_core.dir/src/core/log.c.s"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /Users/kkito/proj/demo/rybaproxy/src/core/log.c -o CMakeFiles/rybaproxy_core.dir/src/core/log.c.s
 
+CMakeFiles/rybaproxy_core.dir/src/db/db.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
+CMakeFiles/rybaproxy_core.dir/src/db/db.c.o: /Users/kkito/proj/demo/rybaproxy/src/db/db.c
+CMakeFiles/rybaproxy_core.dir/src/db/db.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building C object CMakeFiles/rybaproxy_core.dir/src/db/db.c.o"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/db/db.c.o -MF CMakeFiles/rybaproxy_core.dir/src/db/db.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/db/db.c.o -c /Users/kkito/proj/demo/rybaproxy/src/db/db.c
+
+CMakeFiles/rybaproxy_core.dir/src/db/db.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing C source to CMakeFiles/rybaproxy_core.dir/src/db/db.c.i"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /Users/kkito/proj/demo/rybaproxy/src/db/db.c > CMakeFiles/rybaproxy_core.dir/src/db/db.c.i
+
+CMakeFiles/rybaproxy_core.dir/src/db/db.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/rybaproxy_core.dir/src/db/db.c.s"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /Users/kkito/proj/demo/rybaproxy/src/db/db.c -o CMakeFiles/rybaproxy_core.dir/src/db/db.c.s
+
 CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
 CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o: /Users/kkito/proj/demo/rybaproxy/src/proxy/http_proxy.c
 CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_4) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o -MF CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o -c /Users/kkito/proj/demo/rybaproxy/src/proxy/http_proxy.c
 
 CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.i: cmake_force
@@ -131,7 +145,7 @@ CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.s: cmake_force
 CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
 CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o: /Users/kkito/proj/demo/rybaproxy/src/proxy/relay.c
 CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_5) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o -MF CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o -c /Users/kkito/proj/demo/rybaproxy/src/proxy/relay.c
 
 CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.i: cmake_force
@@ -145,7 +159,7 @@ CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.s: cmake_force
 CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
 CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o: /Users/kkito/proj/demo/rybaproxy/src/proxy/server.c
 CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_6) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o -MF CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o -c /Users/kkito/proj/demo/rybaproxy/src/proxy/server.c
 
 CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.i: cmake_force
@@ -159,7 +173,7 @@ CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.s: cmake_force
 CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
 CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.o: /Users/kkito/proj/demo/rybaproxy/src/proxy/session.c
 CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_7) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.o"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.o -MF CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.o -c /Users/kkito/proj/demo/rybaproxy/src/proxy/session.c
 
 CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.i: cmake_force
@@ -173,7 +187,7 @@ CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.s: cmake_force
 CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
 CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o: /Users/kkito/proj/demo/rybaproxy/src/proxy/socks5.c
 CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_8) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building C object CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o -MF CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o -c /Users/kkito/proj/demo/rybaproxy/src/proxy/socks5.c
 
 CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.i: cmake_force
@@ -187,7 +201,7 @@ CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.s: cmake_force
 CMakeFiles/rybaproxy_core.dir/src/router/router.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
 CMakeFiles/rybaproxy_core.dir/src/router/router.c.o: /Users/kkito/proj/demo/rybaproxy/src/router/router.c
 CMakeFiles/rybaproxy_core.dir/src/router/router.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_9) "Building C object CMakeFiles/rybaproxy_core.dir/src/router/router.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building C object CMakeFiles/rybaproxy_core.dir/src/router/router.c.o"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/router/router.c.o -MF CMakeFiles/rybaproxy_core.dir/src/router/router.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/router/router.c.o -c /Users/kkito/proj/demo/rybaproxy/src/router/router.c
 
 CMakeFiles/rybaproxy_core.dir/src/router/router.c.i: cmake_force
@@ -201,7 +215,7 @@ CMakeFiles/rybaproxy_core.dir/src/router/router.c.s: cmake_force
 CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
 CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o: /Users/kkito/proj/demo/rybaproxy/src/stats/stats.c
 CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_10) "Building C object CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building C object CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o -MF CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o -c /Users/kkito/proj/demo/rybaproxy/src/stats/stats.c
 
 CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.i: cmake_force
@@ -215,7 +229,7 @@ CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.s: cmake_force
 CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
 CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o: /Users/kkito/proj/demo/rybaproxy/src/upstream/upstream.c
 CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_11) "Building C object CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Building C object CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o -MF CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o -c /Users/kkito/proj/demo/rybaproxy/src/upstream/upstream.c
 
 CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.i: cmake_force
@@ -226,11 +240,26 @@ CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.s: cmake_force
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.s"
 	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /Users/kkito/proj/demo/rybaproxy/src/upstream/upstream.c -o CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.s
 
+CMakeFiles/rybaproxy_core.dir/src/web/web.c.o: CMakeFiles/rybaproxy_core.dir/flags.make
+CMakeFiles/rybaproxy_core.dir/src/web/web.c.o: /Users/kkito/proj/demo/rybaproxy/src/web/web.c
+CMakeFiles/rybaproxy_core.dir/src/web/web.c.o: CMakeFiles/rybaproxy_core.dir/compiler_depend.ts
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_13) "Building C object CMakeFiles/rybaproxy_core.dir/src/web/web.c.o"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -MD -MT CMakeFiles/rybaproxy_core.dir/src/web/web.c.o -MF CMakeFiles/rybaproxy_core.dir/src/web/web.c.o.d -o CMakeFiles/rybaproxy_core.dir/src/web/web.c.o -c /Users/kkito/proj/demo/rybaproxy/src/web/web.c
+
+CMakeFiles/rybaproxy_core.dir/src/web/web.c.i: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Preprocessing C source to CMakeFiles/rybaproxy_core.dir/src/web/web.c.i"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -E /Users/kkito/proj/demo/rybaproxy/src/web/web.c > CMakeFiles/rybaproxy_core.dir/src/web/web.c.i
+
+CMakeFiles/rybaproxy_core.dir/src/web/web.c.s: cmake_force
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green "Compiling C source to assembly CMakeFiles/rybaproxy_core.dir/src/web/web.c.s"
+	/usr/bin/cc $(C_DEFINES) $(C_INCLUDES) $(C_FLAGS) -S /Users/kkito/proj/demo/rybaproxy/src/web/web.c -o CMakeFiles/rybaproxy_core.dir/src/web/web.c.s
+
 # Object files for target rybaproxy_core
 rybaproxy_core_OBJECTS = \
 "CMakeFiles/rybaproxy_core.dir/src/admin/auth.c.o" \
 "CMakeFiles/rybaproxy_core.dir/src/core/config.c.o" \
 "CMakeFiles/rybaproxy_core.dir/src/core/log.c.o" \
+"CMakeFiles/rybaproxy_core.dir/src/db/db.c.o" \
 "CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o" \
 "CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o" \
 "CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o" \
@@ -238,7 +267,8 @@ rybaproxy_core_OBJECTS = \
 "CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o" \
 "CMakeFiles/rybaproxy_core.dir/src/router/router.c.o" \
 "CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o" \
-"CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o"
+"CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o" \
+"CMakeFiles/rybaproxy_core.dir/src/web/web.c.o"
 
 # External object files for target rybaproxy_core
 rybaproxy_core_EXTERNAL_OBJECTS =
@@ -246,6 +276,7 @@ rybaproxy_core_EXTERNAL_OBJECTS =
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/admin/auth.c.o
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/core/config.c.o
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/core/log.c.o
+librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/db/db.c.o
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o
@@ -254,9 +285,10 @@ librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/router/router.c.o
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o
+librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/src/web/web.c.o
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/build.make
 librybaproxy_core.a: CMakeFiles/rybaproxy_core.dir/link.txt
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_12) "Linking C static library librybaproxy_core.a"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-tsan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_14) "Linking C static library librybaproxy_core.a"
 	$(CMAKE_COMMAND) -P CMakeFiles/rybaproxy_core.dir/cmake_clean_target.cmake
 	$(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/rybaproxy_core.dir/link.txt --verbose=$(VERBOSE)
 

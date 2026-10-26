@@ -29,6 +29,7 @@ void config_init_defaults(config_t *c) {
     memset(c, 0, sizeof *c);
     c->http_port = 8080;
     c->socks5_port = 1080;
+    c->web_port = 9090;
     c->max_connections = 10240;
     c->idle_timeout_sec = 300;
     c->max_session_sec = 3600;
@@ -73,6 +74,7 @@ int config_load(const char *path, config_t *c) {
     /* allow top-level port overrides too */
     c->http_port = get_int(root, "http_port", c->http_port);
     c->socks5_port = get_int(root, "socks5_port", c->socks5_port);
+    c->web_port = get_int(root, "web_port", c->web_port);
 
     const cJSON *limits = cJSON_GetObjectItemCaseSensitive(root, "limits");
     if (cJSON_IsObject(limits)) {

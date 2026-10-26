@@ -38,3 +38,4 @@ stats_snapshot_t stats_get(void) {
 }
 
 void stats_inc_bad_requests(void) { atomic_fetch_add(&g_bad, 1); }
+void stats_inc_dropped_events(void) { atomic_fetch_add(&g_dropped, 1); }

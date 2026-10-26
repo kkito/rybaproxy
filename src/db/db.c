@@ -1,0 +1,268 @@
+#include "rybaproxy/db.h"
+#include "rybaproxy/stats.h"
+#include "rybaproxy/upstream.h"
+
+#include <sqlite3.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
+
+#define DB_QUEUE_CAP 65536
+#define DB_BATCH 256
+
+typedef struct node {
+    session_t snap;
+    char upstream_name[128];
+    struct node *next;
+} node_t;
+
+static sqlite3 *g_db = NULL;
+static sqlite3_stmt *g_stmt = NULL;
+
+static pthread_t g_thread;
+static int g_running = 0;
+static int g_shutdown = 0;
+
+static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_cond = PTHREAD_COND_INITIALIZER;
+static node_t *g_head = NULL;
+static node_t *g_tail = NULL;
+static size_t g_count = 0;
+
+static int g_retention_days = 90;
+
+static const char *SCHEMA =
+"CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL);"
+"CREATE TABLE IF NOT EXISTS upstream_profiles ("
+" id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, type TEXT NOT NULL,"
+" host TEXT, port INTEGER, username TEXT, password TEXT, enabled INTEGER NOT NULL DEFAULT 1,"
+" created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);"
+"CREATE TABLE IF NOT EXISTS rules ("
+" id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, priority INTEGER NOT NULL DEFAULT 100,"
+" enabled INTEGER NOT NULL DEFAULT 1, domain_pattern TEXT, ip_cidr TEXT, port INTEGER DEFAULT 0,"
+" protocol TEXT DEFAULT 'any', upstream_id INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);"
+"CREATE TABLE IF NOT EXISTS sessions ("
+" id INTEGER PRIMARY KEY, protocol TEXT NOT NULL, client_ip TEXT NOT NULL, target_host TEXT NOT NULL,"
+" target_port INTEGER NOT NULL, method TEXT, upstream_id INTEGER, upstream_name TEXT, status INTEGER NOT NULL,"
+" error_code INTEGER, error_msg TEXT, bytes_up INTEGER NOT NULL, bytes_down INTEGER NOT NULL,"
+" started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, duration_ms INTEGER NOT NULL, nginx_forwarded INTEGER NOT NULL DEFAULT 0);"
+"CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(started_at);"
+"CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);";
+
+static void mkdirp(const char *path) {
+    char tmp[512];
+    snprintf(tmp, sizeof tmp, "%s", path);
+    for (char *p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            mkdir(tmp, 0755);
+            *p = '/';
+        }
+    }
+    mkdir(tmp, 0755);
+}
+
+int db_init(const char *path) {
+    if (!path || !path[0]) path = "/var/lib/rybaproxy/stats.db";
+    /* ensure parent dir */
+    char dir[512];
+    snprintf(dir, sizeof dir, "%s", path);
+    char *slash = strrchr(dir, '/');
+    if (slash) { *slash = '\0'; mkdirp(dir); }
+
+    if (sqlite3_open(path, &g_db) != SQLITE_OK || sqlite3_exec(g_db, "SELECT 1;", NULL, NULL, NULL) != SQLITE_OK) {
+        if (g_db) sqlite3_close(g_db);
+        g_db = NULL;
+        if (sqlite3_open("./stats.db", &g_db) != SQLITE_OK) {
+            fprintf(stderr, "db open failed: %s\n", sqlite3_errmsg(g_db));
+            return -1;
+        }
+    }
+    sqlite3_busy_timeout(g_db, 5000);
+    char *err = NULL;
+    sqlite3_exec(g_db, "PRAGMA journal_mode=WAL;", NULL, NULL, &err);
+    sqlite3_exec(g_db, SCHEMA, NULL, NULL, &err);
+    if (err) { fprintf(stderr, "schema err: %s\n", err); sqlite3_free(err); }
+    /* schema version */
+    sqlite3_exec(g_db, "INSERT INTO schema_version(version) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM schema_version);", NULL, NULL, NULL);
+
+    const char *sql = "INSERT INTO sessions(protocol,client_ip,target_host,target_port,method,upstream_id,upstream_name,status,error_code,error_msg,bytes_up,bytes_down,started_at,ended_at,duration_ms,nginx_forwarded) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+    /* we insert id explicitly too; adjust: include id */
+    sql = "INSERT INTO sessions(id,protocol,client_ip,target_host,target_port,method,upstream_id,upstream_name,status,error_code,error_msg,bytes_up,bytes_down,started_at,ended_at,duration_ms,nginx_forwarded) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
+    if (sqlite3_prepare_v2(g_db, sql, -1, &g_stmt, NULL) != SQLITE_OK) {
+        fprintf(stderr, "prepare failed: %s\n", sqlite3_errmsg(g_db));
+        return -1;
+    }
+    return 0;
+}
+
+void db_retention(int days) {
+    if (!g_db) return;
+    if (days <= 0) days = 90;
+    time_t now = time(NULL);
+    time_t cutoff = now - (time_t)days * 86400;
+    char sql[256];
+    snprintf(sql, sizeof sql, "DELETE FROM sessions WHERE started_at < %ld;", (long)cutoff);
+    sqlite3_exec(g_db, sql, NULL, NULL, NULL);
+    snprintf(sql, sizeof sql, "DELETE FROM http_requests WHERE started_at < %ld;", (long)cutoff);
+    sqlite3_exec(g_db, sql, NULL, NULL, NULL);
+}
+
+static void insert_node(node_t *n) {
+    if (!g_db || !g_stmt) return;
+    sqlite3_reset(g_stmt);
+    sqlite3_bind_int64(g_stmt, 1, (sqlite3_int64)n->snap.id);
+    sqlite3_bind_text(g_stmt, 2, n->snap.protocol == PROTO_HTTP ? "http" : "socks5", -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(g_stmt, 3, n->snap.client_ip, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(g_stmt, 4, n->snap.target_host, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(g_stmt, 5, n->snap.target_port);
+    sqlite3_bind_text(g_stmt, 6, n->snap.method, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(g_stmt, 7, n->snap.upstream_id);
+    sqlite3_bind_text(g_stmt, 8, n->upstream_name, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(g_stmt, 9, (int)n->snap.status);
+    sqlite3_bind_int(g_stmt, 10, n->snap.error_code);
+    sqlite3_bind_text(g_stmt, 11, n->snap.error_msg, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(g_stmt, 12, (sqlite3_int64)n->snap.bytes_up);
+    sqlite3_bind_int64(g_stmt, 13, (sqlite3_int64)n->snap.bytes_down);
+    sqlite3_bind_int64(g_stmt, 14, (sqlite3_int64)n->snap.started_at);
+    sqlite3_bind_int64(g_stmt, 15, (sqlite3_int64)n->snap.ended_at);
+    long dur = (n->snap.ended_at > n->snap.started_at) ? (n->snap.ended_at - n->snap.started_at) * 1000 : 0;
+    sqlite3_bind_int64(g_stmt, 16, dur);
+    sqlite3_bind_int(g_stmt, 17, 0);
+    sqlite3_step(g_stmt);
+}
+
+static void *writer_main(void *arg) {
+    (void)arg;
+    time_t last_ret = time(NULL);
+    while (1) {
+        pthread_mutex_lock(&g_lock);
+        while (g_head == NULL && !g_shutdown) {
+            pthread_cond_wait(&g_cond, &g_lock);
+        }
+        /* collect batch */
+        node_t *batch[DB_BATCH];
+        int bn = 0;
+        while (g_head && bn < DB_BATCH) {
+            node_t *n = g_head;
+            g_head = n->next;
+            if (!g_head) g_tail = NULL;
+            g_count--;
+            batch[bn++] = n;
+        }
+        int shutdown = g_shutdown && g_head == NULL && bn == 0;
+        pthread_mutex_unlock(&g_lock);
+
+        if (bn > 0) {
+            sqlite3_exec(g_db, "BEGIN;", NULL, NULL, NULL);
+            for (int i = 0; i < bn; i++) insert_node(batch[i]);
+            sqlite3_exec(g_db, "COMMIT;", NULL, NULL, NULL);
+            for (int i = 0; i < bn; i++) free(batch[i]);
+        }
+
+        /* retention daily */
+        time_t now = time(NULL);
+        if (now - last_ret > 86400) {
+            db_retention(g_retention_days);
+            last_ret = now;
+        }
+
+        if (shutdown) break;
+        if (g_shutdown && g_head == NULL) {
+            /* drain remaining handled by loop; exit when no more */
+            pthread_mutex_lock(&g_lock);
+            if (g_head == NULL) { pthread_mutex_unlock(&g_lock); break; }
+            pthread_mutex_unlock(&g_lock);
+        }
+    }
+    return NULL;
+}
+
+int db_enqueue_session(const session_t *s, const char *upstream_name) {
+    if (!s) return -1;
+    pthread_mutex_lock(&g_lock);
+    if (g_count >= DB_QUEUE_CAP) {
+        pthread_mutex_unlock(&g_lock);
+        stats_inc_dropped_events();
+        return -1;
+    }
+    node_t *n = calloc(1, sizeof *n);
+    n->snap = *s;
+    if (upstream_name) snprintf(n->upstream_name, sizeof n->upstream_name, "%s", upstream_name);
+    else strcpy(n->upstream_name, "direct");
+    if (!g_tail) g_head = g_tail = n;
+    else { g_tail->next = n; g_tail = n; }
+    g_count++;
+    pthread_cond_signal(&g_cond);
+    pthread_mutex_unlock(&g_lock);
+    return 0;
+}
+
+void db_set_retention(int days){ if(days>0) g_retention_days=days; }
+void db_start(void) {
+    g_shutdown = 0;
+    g_running = 1;
+    pthread_create(&g_thread, NULL, writer_main, NULL);
+}
+
+void db_stop(void) {
+    pthread_mutex_lock(&g_lock);
+    g_shutdown = 1;
+    pthread_cond_broadcast(&g_cond);
+    pthread_mutex_unlock(&g_lock);
+    pthread_join(g_thread, NULL);
+    g_running = 0;
+    if (g_stmt) { sqlite3_finalize(g_stmt); g_stmt = NULL; }
+    if (g_db) { sqlite3_close(g_db); g_db = NULL; }
+}
+
+
+
+int db_get_recent_sessions(int limit, char *buf, size_t bufsz) {
+    if (!buf || bufsz == 0) return -1;
+    if (limit <= 0) limit = 100;
+    if (limit > 1000) limit = 1000;
+    buf[0] = '['; buf[1] = '\0';
+    size_t pos = 1;
+    if (!g_db) { snprintf(buf, bufsz, "[]"); return 0; }
+    const char *sql = "SELECT id,protocol,client_ip,target_host,target_port,status,bytes_up,bytes_down,started_at,ended_at FROM sessions ORDER BY started_at DESC LIMIT ?;";
+    sqlite3_stmt *stmt;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &stmt, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_int(stmt, 1, limit);
+    int first = 1;
+    while (sqlite3_step(stmt) == SQLITE_ROW) {
+        char item[512];
+        snprintf(item, sizeof item,
+            "%s{\"id\":%lld,\"protocol\":\"%s\",\"client_ip\":\"%s\",\"target_host\":\"%s\",\"target_port\":%d,\"status\":%d,\"bytes_up\":%lld,\"bytes_down\":%lld,\"started_at\":%lld,\"ended_at\":%lld}",
+            first ? "" : ",",
+            (long long)sqlite3_column_int64(stmt, 0),
+            (const char*)sqlite3_column_text(stmt, 1),
+            (const char*)sqlite3_column_text(stmt, 2),
+            (const char*)sqlite3_column_text(stmt, 3),
+            sqlite3_column_int(stmt, 4),
+            sqlite3_column_int(stmt, 5),
+            (long long)sqlite3_column_int64(stmt, 6),
+            (long long)sqlite3_column_int64(stmt, 7),
+            (long long)sqlite3_column_int64(stmt, 8),
+            (long long)sqlite3_column_int64(stmt, 9));
+        first = 0;
+        size_t ilen = strlen(item);
+        if (pos + ilen + 2 >= bufsz) break;
+        memcpy(buf + pos, item, ilen);
+        pos += ilen;
+    }
+    sqlite3_finalize(stmt);
+    if (pos + 2 < bufsz) {
+        buf[pos] = ']';
+        buf[pos+1] = '\0';
+    } else {
+        buf[bufsz-2] = ']';
+        buf[bufsz-1] = '\0';
+    }
+    return 0;
+}

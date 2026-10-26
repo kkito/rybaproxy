@@ -7,6 +7,7 @@ set(OLD_GLOB
   "/Users/kkito/proj/demo/rybaproxy/src/admin/auth.c"
   "/Users/kkito/proj/demo/rybaproxy/src/core/config.c"
   "/Users/kkito/proj/demo/rybaproxy/src/core/log.c"
+  "/Users/kkito/proj/demo/rybaproxy/src/db/db.c"
   "/Users/kkito/proj/demo/rybaproxy/src/main.c"
   "/Users/kkito/proj/demo/rybaproxy/src/proxy/http_proxy.c"
   "/Users/kkito/proj/demo/rybaproxy/src/proxy/relay.c"
@@ -16,6 +17,7 @@ set(OLD_GLOB
   "/Users/kkito/proj/demo/rybaproxy/src/router/router.c"
   "/Users/kkito/proj/demo/rybaproxy/src/stats/stats.c"
   "/Users/kkito/proj/demo/rybaproxy/src/upstream/upstream.c"
+  "/Users/kkito/proj/demo/rybaproxy/src/web/web.c"
   )
 if(NOT "${NEW_GLOB}" STREQUAL "${OLD_GLOB}")
   message("-- GLOB mismatch!")

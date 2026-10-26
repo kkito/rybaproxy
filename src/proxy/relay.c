@@ -1,4 +1,5 @@
 #include "rybaproxy/relay.h"
+#include "rybaproxy/server.h"
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
@@ -28,6 +29,7 @@ static void event_cb(struct bufferevent *bev, short events, void *ctx) {
     (void)bev;
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR | BEV_EVENT_TIMEOUT)) {
         session_finish(s, (events & BEV_EVENT_TIMEOUT) ? SESS_TIMEOUT : SESS_DONE, 0, NULL);
+        server_session_closed(s);
     }
 }
 

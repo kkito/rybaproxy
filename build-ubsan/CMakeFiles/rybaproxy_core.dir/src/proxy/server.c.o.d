@@ -168,13 +168,20 @@ CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o: \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/netinet6/in6.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/errno.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/errno.h \
+  /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/session.h \
+  /Users/kkito/proj/demo/rybaproxy/build-ubsan/vcpkg_installed/arm64-osx/include/event2/bufferevent.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread/sched.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread/pthread_impl.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/pthread/qos.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/qos.h \
+  /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/_types/_mach_port_t.h \
   /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/auth.h \
   /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/http_proxy.h \
   /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/relay.h \
-  /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/session.h \
-  /Users/kkito/proj/demo/rybaproxy/build-ubsan/vcpkg_installed/arm64-osx/include/event2/bufferevent.h \
   /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/socks5.h \
   /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/stats.h \
+  /Users/kkito/proj/demo/rybaproxy/include/rybaproxy/db.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/arpa/inet.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/fcntl.h \
   /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/sys/fcntl.h \

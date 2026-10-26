@@ -23,6 +23,7 @@ typedef struct {
     rule_t *rules;
     int count;
     int cap;
+    int next_rule_id;
     char default_upstream[RYBA_NAME_MAX];
     bool fallback_to_direct;
 } router_t;

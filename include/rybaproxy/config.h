@@ -9,6 +9,7 @@
 typedef struct {
     int http_port;
     int socks5_port;
+    int web_port;
     int max_connections;
     int idle_timeout_sec;
     int max_session_sec;

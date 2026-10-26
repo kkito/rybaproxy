@@ -1,8 +1,8 @@
-test_smoke 1 0.664831
-test_config 1 0.556099
-test_router 1 0.559149
-test_auth 1 0.559191
-test_socks5 1 0.635835
-test_http_proxy 1 0.807484
-test_stats 1 0.572966
+test_smoke 1 0.659063
+test_config 1 0.588952
+test_router 1 0.553347
+test_auth 1 0.562658
+test_socks5 1 0.55733
+test_http_proxy 1 0.678337
+test_stats 1 0.688415
 ---

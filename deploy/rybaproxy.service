@@ -1,0 +1,13 @@
+[Unit]
+Description=rybaproxy gateway
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/rybaproxy -c /etc/rybaproxy/config.json
+Restart=on-failure
+User=rybaproxy
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

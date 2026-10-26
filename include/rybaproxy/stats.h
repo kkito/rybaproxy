@@ -17,5 +17,6 @@ void stats_init(void);
 void stats_record_session(const session_t *s);
 stats_snapshot_t stats_get(void);
 void stats_inc_bad_requests(void);
+void stats_inc_dropped_events(void);
 
 #endif

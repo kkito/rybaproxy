@@ -316,6 +316,30 @@ src/core/log.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/core/log.c.s
 .PHONY : src/core/log.c.s
 
+src/db/db.o: src/db/db.c.o
+.PHONY : src/db/db.o
+
+# target to build an object file
+src/db/db.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/db/db.c.o
+.PHONY : src/db/db.c.o
+
+src/db/db.i: src/db/db.c.i
+.PHONY : src/db/db.i
+
+# target to preprocess a source file
+src/db/db.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/db/db.c.i
+.PHONY : src/db/db.c.i
+
+src/db/db.s: src/db/db.c.s
+.PHONY : src/db/db.s
+
+# target to generate assembly for a file
+src/db/db.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/db/db.c.s
+.PHONY : src/db/db.c.s
+
 src/main.o: src/main.c.o
 .PHONY : src/main.o
 
@@ -532,6 +556,30 @@ src/upstream/upstream.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.s
 .PHONY : src/upstream/upstream.c.s
 
+src/web/web.o: src/web/web.c.o
+.PHONY : src/web/web.o
+
+# target to build an object file
+src/web/web.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/web/web.c.o
+.PHONY : src/web/web.c.o
+
+src/web/web.i: src/web/web.c.i
+.PHONY : src/web/web.i
+
+# target to preprocess a source file
+src/web/web.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/web/web.c.i
+.PHONY : src/web/web.c.i
+
+src/web/web.s: src/web/web.c.s
+.PHONY : src/web/web.s
+
+# target to generate assembly for a file
+src/web/web.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/web/web.c.s
+.PHONY : src/web/web.c.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -559,6 +607,9 @@ help:
 	@echo "... src/core/log.o"
 	@echo "... src/core/log.i"
 	@echo "... src/core/log.s"
+	@echo "... src/db/db.o"
+	@echo "... src/db/db.i"
+	@echo "... src/db/db.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
@@ -586,6 +637,9 @@ help:
 	@echo "... src/upstream/upstream.o"
 	@echo "... src/upstream/upstream.i"
 	@echo "... src/upstream/upstream.s"
+	@echo "... src/web/web.o"
+	@echo "... src/web/web.i"
+	@echo "... src/web/web.s"
 .PHONY : help
 
 

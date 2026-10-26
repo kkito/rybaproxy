@@ -2,6 +2,8 @@
 #include "rybaproxy/log.h"
 #include "rybaproxy/server.h"
 #include "rybaproxy/stats.h"
+#include "rybaproxy/db.h"
+#include "rybaproxy/web.h"
 
 #include <signal.h>
 #include <stdio.h>
@@ -41,6 +43,10 @@ int main(int argc, char **argv) {
         }
     }
 
+    if (db_init(cfg.db_path) != 0) { fprintf(stderr, "db_init failed\n"); }
+    db_set_retention(cfg.retention_days);
+    db_start();
+
     g_srv = calloc(1, sizeof *g_srv);
     if (server_init(g_srv, &cfg) != 0) {
         LOG_ERROR("server_init failed");
@@ -50,9 +56,11 @@ int main(int argc, char **argv) {
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
 
-    LOG_INFO("rybaproxy listening http=%d socks5=%d", cfg.http_port, cfg.socks5_port);
+    g_srv->web_ctx = web_start(g_srv, cfg.web_port);
+    LOG_INFO("rybaproxy listening http=%d socks5=%d web=%d", cfg.http_port, cfg.socks5_port, cfg.web_port);
     server_run(g_srv);
 
+    db_stop();
     server_free(g_srv);
     config_free(&cfg);
     free(g_srv);

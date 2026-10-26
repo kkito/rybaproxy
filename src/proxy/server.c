@@ -9,6 +9,7 @@
 #include "rybaproxy/upstream.h"
 #include "rybaproxy/session.h"
 #include "rybaproxy/stats.h"
+#include "rybaproxy/db.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -102,7 +103,18 @@ static int upstream_connect_profile(upstream_profile_t *up, const char *host, ui
 
 static void http_finish(conn_t *c, int status) {
     (void)status;
-    if (c->session) stats_record_session(c->session);
+    if (c->session) {
+        if (c->session->bev_client) bufferevent_setcb(c->session->bev_client, NULL, NULL, NULL, NULL);
+        if (c->session->bev_upstream) bufferevent_setcb(c->session->bev_upstream, NULL, NULL, NULL, NULL);
+        c->session->user_data = NULL;
+        stats_record_session(c->session);
+        const char *up_name = "direct";
+        if (c->srv) {
+            upstream_profile_t *up = find_upstream_by_id(c->srv, c->session->upstream_id);
+            if (up) up_name = up->name;
+        }
+        db_enqueue_session(c->session, up_name);
+    }
     if (c->session && c->session->bev_client) {
         bufferevent_flush(c->session->bev_client, EV_WRITE, BEV_FLUSH);
         int fd = bufferevent_getfd(c->session->bev_client);
@@ -456,6 +468,7 @@ static void socks_accept_cb(struct evconnlistener *lev, evutil_socket_t fd, stru
 
 int server_init(server_ctx_t *ctx, const config_t *cfg) {
     memset(ctx, 0, sizeof *ctx);
+    pthread_mutex_init(&ctx->lock, NULL);
     ctx->config = *cfg;
     ctx->upstreams = cfg->upstreams;
     ctx->upstream_count = cfg->upstream_count;
@@ -496,10 +509,16 @@ int server_run(server_ctx_t *ctx) {
 }
 
 void server_free(server_ctx_t *ctx) {
+    pthread_mutex_destroy(&ctx->lock);
     if (ctx->base) event_base_free(ctx->base);
     router_free(&ctx->router);
     /* do not free upstreams if owned by config? free anyway */
     free(ctx->upstreams);
     ctx->upstreams = NULL;
     ctx->upstream_count = 0;
+}
+
+void server_session_closed(session_t *s) {
+    if (!s || !s->user_data) return;
+    http_finish((conn_t*)s->user_data, 0);
 }
