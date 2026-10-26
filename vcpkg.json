@@ -1,0 +1,20 @@
+{
+  "name": "rybaproxy",
+  "version": "0.1.0",
+  "description": "Stable C proxy gateway (HTTP/SOCKS5) like Rybakina",
+  "dependencies": [
+    "libevent",
+    "openssl",
+    "sqlite3",
+    "cjson",
+    "cmocka",
+    {
+      "name": "civetweb",
+      "features": [
+        "ssl"
+      ]
+    },
+    "llhttp",
+    "c-ares"
+  ]
+}

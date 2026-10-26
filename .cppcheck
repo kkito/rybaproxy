@@ -1,0 +1,5 @@
+--enable=all
+--inconclusive
+--std=c11
+--suppress=missingIncludeSystem
+--quiet

@@ -1,0 +1,23 @@
+Start testing: Oct 26 08:27 CST
+----------------------------------------------------------
+1/1 Testing: smoke
+1/1 Test: smoke
+Command: "/Users/kkito/proj/demo/rybaproxy/build-asan/tests/test_smoke"
+Directory: /Users/kkito/proj/demo/rybaproxy/build-asan/tests
+"smoke" start time: Oct 26 08:27 CST
+Output:
+----------------------------------------------------------
+[==========] tests: Running 1 test(s).
+[ RUN      ] test_smoke
+[       OK ] test_smoke
+[==========] tests: 1 test(s) run.
+[  PASSED  ] 1 test(s).
+<end of output>
+Test time =   0.49 sec
+----------------------------------------------------------
+Test Passed.
+"smoke" end time: Oct 26 08:27 CST
+"smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 26 08:27 CST

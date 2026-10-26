@@ -1,0 +1,20 @@
+[
+{
+  "directory": "/Users/kkito/proj/demo/rybaproxy/build-asan",
+  "command": "/usr/bin/cc  -I/Users/kkito/proj/demo/rybaproxy/include -I/Users/kkito/proj/demo/rybaproxy/third_party -isystem /Users/kkito/proj/demo/rybaproxy/build-asan/vcpkg_installed/arm64-osx/include -g -std=c11 -arch arm64 -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined -o CMakeFiles/rybaproxy.dir/src/core/log.c.o -c /Users/kkito/proj/demo/rybaproxy/src/core/log.c",
+  "file": "/Users/kkito/proj/demo/rybaproxy/src/core/log.c",
+  "output": "CMakeFiles/rybaproxy.dir/src/core/log.c.o"
+},
+{
+  "directory": "/Users/kkito/proj/demo/rybaproxy/build-asan",
+  "command": "/usr/bin/cc  -I/Users/kkito/proj/demo/rybaproxy/include -I/Users/kkito/proj/demo/rybaproxy/third_party -isystem /Users/kkito/proj/demo/rybaproxy/build-asan/vcpkg_installed/arm64-osx/include -g -std=c11 -arch arm64 -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined -o CMakeFiles/rybaproxy.dir/src/main.c.o -c /Users/kkito/proj/demo/rybaproxy/src/main.c",
+  "file": "/Users/kkito/proj/demo/rybaproxy/src/main.c",
+  "output": "CMakeFiles/rybaproxy.dir/src/main.c.o"
+},
+{
+  "directory": "/Users/kkito/proj/demo/rybaproxy/build-asan/tests",
+  "command": "/usr/bin/cc -DCMOCKA_STATIC -isystem /Users/kkito/proj/demo/rybaproxy/build-asan/vcpkg_installed/arm64-osx/include -g -std=c11 -arch arm64 -o CMakeFiles/test_smoke.dir/unit/test_smoke.c.o -c /Users/kkito/proj/demo/rybaproxy/tests/unit/test_smoke.c",
+  "file": "/Users/kkito/proj/demo/rybaproxy/tests/unit/test_smoke.c",
+  "output": "tests/CMakeFiles/test_smoke.dir/unit/test_smoke.c.o"
+}
+]

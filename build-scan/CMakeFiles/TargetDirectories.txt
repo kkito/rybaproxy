@@ -1,0 +1,8 @@
+/Users/kkito/proj/demo/rybaproxy/build-scan/CMakeFiles/rybaproxy.dir
+/Users/kkito/proj/demo/rybaproxy/build-scan/CMakeFiles/test.dir
+/Users/kkito/proj/demo/rybaproxy/build-scan/CMakeFiles/edit_cache.dir
+/Users/kkito/proj/demo/rybaproxy/build-scan/CMakeFiles/rebuild_cache.dir
+/Users/kkito/proj/demo/rybaproxy/build-scan/tests/CMakeFiles/test_smoke.dir
+/Users/kkito/proj/demo/rybaproxy/build-scan/tests/CMakeFiles/test.dir
+/Users/kkito/proj/demo/rybaproxy/build-scan/tests/CMakeFiles/edit_cache.dir
+/Users/kkito/proj/demo/rybaproxy/build-scan/tests/CMakeFiles/rebuild_cache.dir

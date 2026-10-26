@@ -1,0 +1,8 @@
+{
+	"InstallScripts" : 
+	[
+		"/Users/kkito/proj/demo/rybaproxy/build-scan/cmake_install.cmake",
+		"/Users/kkito/proj/demo/rybaproxy/build-scan/tests/cmake_install.cmake"
+	],
+	"Parallel" : false
+}
