@@ -2806,8 +2806,8 @@ events:
     checks:
       - "Detecting C compiler ABI info"
     directories:
-      source: "/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-Z1vp9y"
-      binary: "/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-Z1vp9y"
+      source: "/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-pw7cym"
+      binary: "/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-pw7cym"
     cmakeVariables:
       CMAKE_C_FLAGS: ""
       CMAKE_C_FLAGS_DEBUG: "-g"
@@ -2823,18 +2823,18 @@ events:
       variable: "CMAKE_C_ABI_COMPILED"
       cached: false
       stdout: |
-        Change Dir: '/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-Z1vp9y'
+        Change Dir: '/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-pw7cym'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_42c95/fast
-        /Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/cmTC_42c95.dir/build.make CMakeFiles/cmTC_42c95.dir/build
-        Building C object CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o
-        /usr/bin/cc   -arch arm64   -v -Wl,-v -MD -MT CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_f0f45/fast
+        /Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/cmTC_f0f45.dir/build.make CMakeFiles/cmTC_f0f45.dir/build
+        Building C object CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o
+        /usr/bin/cc   -arch arm64   -v -Wl,-v -MD -MT CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c
         Apple clang version 21.0.0 (clang-2100.1.1.101)
         Target: arm64-apple-darwin25.6.0
         Thread model: posix
         InstalledDir: /Library/Developer/CommandLineTools/usr/bin
         clang: warning: -Wl,-v: 'linker' input unused [-Wunused-command-line-argument]
-         "/Library/Developer/CommandLineTools/usr/bin/clang" -cc1 -triple arm64-apple-macosx26.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=26.5 -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-Z1vp9y -target-linker-version 1267 -v -fcoverage-compilation-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-Z1vp9y -resource-dir /Library/Developer/CommandLineTools/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -sys-header-deps -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Library/Developer/CommandLineTools/usr/lib/clang/21/include -internal-externc-isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Library/Developer/CommandLineTools/usr/include -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -x c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c
+         "/Library/Developer/CommandLineTools/usr/bin/clang" -cc1 -triple arm64-apple-macosx26.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=26.5 -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-pw7cym -target-linker-version 1267 -v -fcoverage-compilation-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-pw7cym -resource-dir /Library/Developer/CommandLineTools/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -sys-header-deps -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Library/Developer/CommandLineTools/usr/lib/clang/21/include -internal-externc-isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Library/Developer/CommandLineTools/usr/include -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -x c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c
         clang -cc1 version 21.0.0 (clang-2100.1.1.101) default target arm64-apple-darwin25.6.0
         ignoring nonexistent directory "/usr/local/include"
         ignoring nonexistent directory "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/local/include"
@@ -2847,13 +2847,13 @@ events:
          /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks (framework directory)
          /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/SubFrameworks (framework directory)
         End of search list.
-        Linking C executable cmTC_42c95
-        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_42c95.dir/link.txt --verbose=1
+        Linking C executable cmTC_f0f45
+        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f0f45.dir/link.txt --verbose=1
         Apple clang version 21.0.0 (clang-2100.1.1.101)
         Target: arm64-apple-darwin25.6.0
         Thread model: posix
         InstalledDir: /Library/Developer/CommandLineTools/usr/bin
-         "/Library/Developer/CommandLineTools/usr/bin/ld" -demangle -lto_library /Library/Developer/CommandLineTools/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 26.0.0 26.5 -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_42c95 -L/usr/local/lib -search_paths_first -headerpad_max_install_names -v CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -lSystem /Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a
+         "/Library/Developer/CommandLineTools/usr/bin/ld" -demangle -lto_library /Library/Developer/CommandLineTools/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 26.0.0 26.5 -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_f0f45 -L/usr/local/lib -search_paths_first -headerpad_max_install_names -v CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -lSystem /Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a
         @(#)PROGRAM:ld PROJECT:ld-1267
         BUILD 16:38:58 Jun  8 2026
         configured to support archs: armv6 armv7 armv7s arm64 arm64e arm64_32 i386 x86_64 x86_64h armv6m armv7k armv7m armv7em armv8m.main armv8.1m.main
@@ -2865,7 +2865,7 @@ events:
         	/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/lib/swift
         Framework search paths:
         	/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks
-        /usr/bin/cc  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -v -Wl,-v CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -o cmTC_42c95
+        /usr/bin/cc  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names -v -Wl,-v CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -o cmTC_f0f45
         
       exitCode: 0
   -
@@ -2907,18 +2907,18 @@ events:
       Parsed C implicit link information:
         link line regex: [^( *|.*[/\\])(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)|CMAKE_LINK_STARTFILE-NOTFOUND|([^/\\]+-)?ld|collect2)[^/\\]*( |$)]
         linker tool regex: [^[ 	]*(->|"|[0-9]+>[ 	-]*Build:[ 	0-9]+ ms[ 	]*)?[ 	]*(([^"]*[/\\])?(ld[0-9]*(|\\.[a-rt-z][a-z]*|\\.s[a-np-z][a-z]*|\\.so[a-z]+)))("|,| |$)]
-        ignore line: [Change Dir: '/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-Z1vp9y']
+        ignore line: [Change Dir: '/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-pw7cym']
         ignore line: []
-        ignore line: [Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_42c95/fast]
-        ignore line: [/Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/cmTC_42c95.dir/build.make CMakeFiles/cmTC_42c95.dir/build]
-        ignore line: [Building C object CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o]
-        ignore line: [/usr/bin/cc   -arch arm64   -v -Wl -v -MD -MT CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c]
+        ignore line: [Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_f0f45/fast]
+        ignore line: [/Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/cmTC_f0f45.dir/build.make CMakeFiles/cmTC_f0f45.dir/build]
+        ignore line: [Building C object CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o]
+        ignore line: [/usr/bin/cc   -arch arm64   -v -Wl -v -MD -MT CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -MF CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o.d -o CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c]
         ignore line: [Apple clang version 21.0.0 (clang-2100.1.1.101)]
         ignore line: [Target: arm64-apple-darwin25.6.0]
         ignore line: [Thread model: posix]
         ignore line: [InstalledDir: /Library/Developer/CommandLineTools/usr/bin]
         ignore line: [clang: warning: -Wl -v: 'linker' input unused [-Wunused-command-line-argument]]
-        ignore line: [ "/Library/Developer/CommandLineTools/usr/bin/clang" -cc1 -triple arm64-apple-macosx26.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=26.5 -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-Z1vp9y -target-linker-version 1267 -v -fcoverage-compilation-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-Z1vp9y -resource-dir /Library/Developer/CommandLineTools/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -sys-header-deps -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Library/Developer/CommandLineTools/usr/lib/clang/21/include -internal-externc-isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Library/Developer/CommandLineTools/usr/include -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -x c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c]
+        ignore line: [ "/Library/Developer/CommandLineTools/usr/bin/clang" -cc1 -triple arm64-apple-macosx26.0.0 -Wundef-prefix=TARGET_OS_ -Wdeprecated-objc-isa-usage -Werror=deprecated-objc-isa-usage -Werror=implicit-function-declaration -emit-obj -disable-free -clear-ast-before-backend -disable-llvm-verifier -discard-value-names -main-file-name CMakeCCompilerABI.c -mrelocation-model pic -pic-level 2 -mframe-pointer=non-leaf -fno-strict-return -ffp-contract=on -fno-rounding-math -funwind-tables=1 -fobjc-msgsend-selector-stubs -fno-sized-deallocation -target-sdk-version=26.5 -fvisibility-inlines-hidden-static-local-var -fno-modulemap-allow-subdirectory-search -fdefine-target-os-macros -fno-assume-unique-vtables -fno-modulemap-allow-subdirectory-search -enable-tlsdesc -target-cpu apple-m1 -target-feature +v8.5a -target-feature +aes -target-feature +altnzcv -target-feature +ccdp -target-feature +ccpp -target-feature +complxnum -target-feature +crc -target-feature +dotprod -target-feature +flagm -target-feature +fp-armv8 -target-feature +fp16fml -target-feature +fptoint -target-feature +fullfp16 -target-feature +jsconv -target-feature +lse -target-feature +neon -target-feature +pauth -target-feature +perfmon -target-feature +predres -target-feature +ras -target-feature +rcpc -target-feature +rdm -target-feature +sb -target-feature +sha2 -target-feature +sha3 -target-feature +specrestrict -target-feature +ssbs -target-abi darwinpcs -debugger-tuning=lldb -fdebug-compilation-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-pw7cym -target-linker-version 1267 -v -fcoverage-compilation-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-pw7cym -resource-dir /Library/Developer/CommandLineTools/usr/lib/clang/21 -dependency-file CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o.d -skip-unused-modulemap-deps -MT CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -sys-header-deps -isysroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -I/usr/local/include -internal-isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/local/include -internal-isystem /Library/Developer/CommandLineTools/usr/lib/clang/21/include -internal-externc-isystem /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include -internal-externc-isystem /Library/Developer/CommandLineTools/usr/include -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/SubFrameworks -internal-iframework /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/Library/Frameworks -Wno-elaborated-enum-base -ferror-limit 19 -stack-protector 1 -fstack-check -mdarwin-stkchk-strong-link -fblocks -fencode-extended-block-signature -fregister-global-dtors-with-atexit -fgnuc-version=4.2.1 -fskip-odr-check-in-gmf -fmax-type-align=16 -fcommon -clang-vendor-feature=+disableNonDependentMemberExprInCurrentInstantiation -fno-odr-hash-protocols -clang-vendor-feature=+enableAggressiveVLAFolding -clang-vendor-feature=+revert09abecef7bbf -clang-vendor-feature=+thisNoAlignAttr -clang-vendor-feature=+thisNoNullAttr -clang-vendor-feature=+disableAtImportPrivateFrameworkInImplementationError -Wno-error=allocator-wrappers -fdwarf2-cfi-asm -o CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -x c /opt/homebrew/share/cmake/Modules/CMakeCCompilerABI.c]
         ignore line: [clang -cc1 version 21.0.0 (clang-2100.1.1.101) default target arm64-apple-darwin25.6.0]
         ignore line: [ignoring nonexistent directory "/usr/local/include"]
         ignore line: [ignoring nonexistent directory "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/local/include"]
@@ -2931,14 +2931,14 @@ events:
         ignore line: [ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/Frameworks (framework directory)]
         ignore line: [ /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/System/Library/SubFrameworks (framework directory)]
         ignore line: [End of search list.]
-        ignore line: [Linking C executable cmTC_42c95]
-        ignore line: [/opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_42c95.dir/link.txt --verbose=1]
+        ignore line: [Linking C executable cmTC_f0f45]
+        ignore line: [/opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f0f45.dir/link.txt --verbose=1]
         ignore line: [Apple clang version 21.0.0 (clang-2100.1.1.101)]
         ignore line: [Target: arm64-apple-darwin25.6.0]
         ignore line: [Thread model: posix]
         ignore line: [InstalledDir: /Library/Developer/CommandLineTools/usr/bin]
-        link line: [ "/Library/Developer/CommandLineTools/usr/bin/ld" -demangle -lto_library /Library/Developer/CommandLineTools/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 26.0.0 26.5 -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_42c95 -L/usr/local/lib -search_paths_first -headerpad_max_install_names -v CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -lSystem /Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a] ==> linker [/Library/Developer/CommandLineTools/usr/bin/ld]
-        link line: [ "/Library/Developer/CommandLineTools/usr/bin/ld" -demangle -lto_library /Library/Developer/CommandLineTools/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 26.0.0 26.5 -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_42c95 -L/usr/local/lib -search_paths_first -headerpad_max_install_names -v CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o -lSystem /Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a]
+        link line: [ "/Library/Developer/CommandLineTools/usr/bin/ld" -demangle -lto_library /Library/Developer/CommandLineTools/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 26.0.0 26.5 -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_f0f45 -L/usr/local/lib -search_paths_first -headerpad_max_install_names -v CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -lSystem /Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a] ==> linker [/Library/Developer/CommandLineTools/usr/bin/ld]
+        link line: [ "/Library/Developer/CommandLineTools/usr/bin/ld" -demangle -lto_library /Library/Developer/CommandLineTools/usr/lib/libLTO.dylib -dynamic -arch arm64 -platform_version macos 26.0.0 26.5 -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -mllvm -enable-linkonceodr-outlining -o cmTC_f0f45 -L/usr/local/lib -search_paths_first -headerpad_max_install_names -v CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o -lSystem /Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a]
           arg [/Library/Developer/CommandLineTools/usr/bin/ld] ==> ignore
           arg [-demangle] ==> ignore
           arg [-lto_library] ==> ignore, skip following value
@@ -2955,12 +2955,12 @@ events:
           arg [-mllvm] ==> ignore
           arg [-enable-linkonceodr-outlining] ==> ignore
           arg [-o] ==> ignore
-          arg [cmTC_42c95] ==> ignore
+          arg [cmTC_f0f45] ==> ignore
           arg [-L/usr/local/lib] ==> dir [/usr/local/lib]
           arg [-search_paths_first] ==> ignore
           arg [-headerpad_max_install_names] ==> ignore
           arg [-v] ==> ignore
-          arg [CMakeFiles/cmTC_42c95.dir/CMakeCCompilerABI.c.o] ==> ignore
+          arg [CMakeFiles/cmTC_f0f45.dir/CMakeCCompilerABI.c.o] ==> ignore
           arg [-lSystem] ==> lib [System]
           arg [/Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a] ==> lib [/Library/Developer/CommandLineTools/usr/lib/clang/21/lib/darwin/libclang_rt.osx.a]
         linker tool for 'C': /Library/Developer/CommandLineTools/usr/bin/ld 
@@ -2998,7 +2998,7 @@ events:
     backtrace:
       - "/opt/homebrew/share/cmake/Modules/FindPkgConfig.cmake:517 (find_program)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:16 (find_package)"
+      - "CMakeLists.txt:34 (find_package)"
     mode: "program"
     variable: "PKG_CONFIG_EXECUTABLE"
     description: "pkg-config executable"
@@ -3508,7 +3508,7 @@ events:
     backtrace:
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:117 (find_path)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:18 (find_package)"
+      - "CMakeLists.txt:36 (find_package)"
     mode: "path"
     variable: "_event_h"
     description: "Path to a file."
@@ -3594,7 +3594,7 @@ events:
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:132 (find_library)"
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:153 (find_event_lib)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:18 (find_package)"
+      - "CMakeLists.txt:36 (find_package)"
     mode: "library"
     variable: "_event_lib_dbg"
     description: "Path to a library."
@@ -3719,7 +3719,7 @@ events:
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:135 (find_library)"
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:153 (find_event_lib)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:18 (find_package)"
+      - "CMakeLists.txt:36 (find_package)"
     mode: "library"
     variable: "_event_lib_rel"
     description: "Path to a library."
@@ -3850,7 +3850,7 @@ events:
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:132 (find_library)"
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:153 (find_event_lib)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:18 (find_package)"
+      - "CMakeLists.txt:36 (find_package)"
     mode: "library"
     variable: "_event_lib_dbg"
     description: "Path to a library."
@@ -3975,7 +3975,7 @@ events:
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:135 (find_library)"
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:153 (find_event_lib)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:18 (find_package)"
+      - "CMakeLists.txt:36 (find_package)"
     mode: "library"
     variable: "_event_lib_rel"
     description: "Path to a library."
@@ -4106,7 +4106,7 @@ events:
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:132 (find_library)"
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:153 (find_event_lib)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:18 (find_package)"
+      - "CMakeLists.txt:36 (find_package)"
     mode: "library"
     variable: "_event_lib_dbg"
     description: "Path to a library."
@@ -4231,7 +4231,7 @@ events:
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:135 (find_library)"
       - "build-asan/vcpkg_installed/arm64-osx/share/libevent/LibeventConfig.cmake:153 (find_event_lib)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:18 (find_package)"
+      - "CMakeLists.txt:36 (find_package)"
     mode: "library"
     variable: "_event_lib_rel"
     description: "Path to a library."
@@ -4360,7 +4360,7 @@ events:
     kind: "find_package-v1"
     backtrace:
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:18 (find_package)"
+      - "CMakeLists.txt:36 (find_package)"
     name: "Libevent"
     configs:
       -
@@ -4592,7 +4592,7 @@ events:
     backtrace:
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:23 (find_path)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "path"
     variable: "OPENSSL_INCLUDE_DIR"
     description: "Path to a file."
@@ -4673,7 +4673,7 @@ events:
     backtrace:
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:24 (find_library)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "library"
     variable: "LIB_EAY_DEBUG"
     description: "Path to a library."
@@ -4762,7 +4762,7 @@ events:
     backtrace:
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:25 (find_library)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "library"
     variable: "LIB_EAY_RELEASE"
     description: "Path to a library."
@@ -4850,7 +4850,7 @@ events:
     backtrace:
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:26 (find_library)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "library"
     variable: "SSL_EAY_DEBUG"
     description: "Path to a library."
@@ -4939,7 +4939,7 @@ events:
     backtrace:
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:27 (find_library)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "library"
     variable: "SSL_EAY_RELEASE"
     description: "Path to a library."
@@ -5027,7 +5027,7 @@ events:
     backtrace:
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:42 (find_library)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "library"
     variable: "OPENSSL_CRYPTO_LIBRARY"
     description: "Path to a library."
@@ -5149,7 +5149,7 @@ events:
     backtrace:
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:43 (find_library)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "library"
     variable: "OPENSSL_SSL_LIBRARY"
     description: "Path to a library."
@@ -5276,7 +5276,7 @@ events:
       - "/opt/homebrew/share/cmake/Modules/FindOpenSSL.cmake:297 (pkg_check_modules)"
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:47 (_find_package)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "library"
     variable: "pkgcfg_lib__OPENSSL_ssl"
     description: "Path to a library."
@@ -5367,7 +5367,7 @@ events:
       - "/opt/homebrew/share/cmake/Modules/FindOpenSSL.cmake:297 (pkg_check_modules)"
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:47 (_find_package)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "library"
     variable: "pkgcfg_lib__OPENSSL_crypto"
     description: "Path to a library."
@@ -5454,7 +5454,7 @@ events:
       - "/opt/homebrew/share/cmake/Modules/FindOpenSSL.cmake:370 (find_path)"
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:47 (_find_package)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "path"
     variable: "OPENSSL_INCLUDE_DIR"
     description: "Path to a file."
@@ -5551,7 +5551,7 @@ events:
     backtrace:
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:70 (find_library)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     mode: "library"
     variable: "OPENSSL_DL_LIBRARY"
     description: "Path to a library."
@@ -5706,12 +5706,12 @@ events:
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
       - "build-asan/vcpkg_installed/arm64-osx/share/openssl/vcpkg-cmake-wrapper.cmake:79 (find_package)"
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:893 (include)"
-      - "CMakeLists.txt:19 (find_package)"
+      - "CMakeLists.txt:37 (find_package)"
     checks:
       - "Performing Test CMAKE_HAVE_LIBC_PTHREAD"
     directories:
-      source: "/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-nutoWO"
-      binary: "/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-nutoWO"
+      source: "/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-jmpskR"
+      binary: "/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-jmpskR"
     cmakeVariables:
       CMAKE_C_FLAGS: ""
       CMAKE_C_FLAGS_DEBUG: "-g"
@@ -5727,22 +5727,22 @@ events:
       variable: "CMAKE_HAVE_LIBC_PTHREAD"
       cached: true
       stdout: |
-        Change Dir: '/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-nutoWO'
+        Change Dir: '/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-jmpskR'
         
-        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_f37f6/fast
-        /Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/cmTC_f37f6.dir/build.make CMakeFiles/cmTC_f37f6.dir/build
-        Building C object CMakeFiles/cmTC_f37f6.dir/src.c.o
-        /usr/bin/cc -DCMAKE_HAVE_LIBC_PTHREAD  -std=c11 -arch arm64 -MD -MT CMakeFiles/cmTC_f37f6.dir/src.c.o -MF CMakeFiles/cmTC_f37f6.dir/src.c.o.d -o CMakeFiles/cmTC_f37f6.dir/src.c.o -c /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-nutoWO/src.c
-        Linking C executable cmTC_f37f6
-        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_f37f6.dir/link.txt --verbose=1
-        /usr/bin/cc  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/cmTC_f37f6.dir/src.c.o -o cmTC_f37f6
+        Run Build Command(s): /opt/homebrew/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile cmTC_69eac/fast
+        /Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/cmTC_69eac.dir/build.make CMakeFiles/cmTC_69eac.dir/build
+        Building C object CMakeFiles/cmTC_69eac.dir/src.c.o
+        /usr/bin/cc -DCMAKE_HAVE_LIBC_PTHREAD  -std=c11 -arch arm64 -MD -MT CMakeFiles/cmTC_69eac.dir/src.c.o -MF CMakeFiles/cmTC_69eac.dir/src.c.o.d -o CMakeFiles/cmTC_69eac.dir/src.c.o -c /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles/CMakeScratch/TryCompile-jmpskR/src.c
+        Linking C executable cmTC_69eac
+        /opt/homebrew/bin/cmake -E cmake_link_script CMakeFiles/cmTC_69eac.dir/link.txt --verbose=1
+        /usr/bin/cc  -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/cmTC_69eac.dir/src.c.o -o cmTC_69eac
         
       exitCode: 0
   -
     kind: "find_package-v1"
     backtrace:
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:20 (find_package)"
+      - "CMakeLists.txt:38 (find_package)"
     name: "unofficial-sqlite3"
     configs:
       -
@@ -5926,7 +5926,7 @@ events:
     kind: "find_package-v1"
     backtrace:
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:21 (find_package)"
+      - "CMakeLists.txt:39 (find_package)"
     name: "cJSON"
     configs:
       -
@@ -6157,7 +6157,7 @@ events:
     kind: "find_package-v1"
     backtrace:
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:22 (find_package)"
+      - "CMakeLists.txt:40 (find_package)"
     name: "CivetWeb"
     configs:
       -
@@ -6392,7 +6392,7 @@ events:
     kind: "find_package-v1"
     backtrace:
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:23 (find_package)"
+      - "CMakeLists.txt:41 (find_package)"
     name: "llhttp"
     configs:
       -
@@ -6576,7 +6576,7 @@ events:
     kind: "find_package-v1"
     backtrace:
       - "/Users/kkito/vcpkg/scripts/buildsystems/vcpkg.cmake:939 (_find_package)"
-      - "CMakeLists.txt:24 (find_package)"
+      - "CMakeLists.txt:42 (find_package)"
     name: "c-ares"
     configs:
       -

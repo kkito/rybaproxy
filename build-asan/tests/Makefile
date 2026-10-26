@@ -141,6 +141,186 @@ test_smoke/fast:
 	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_smoke.dir/build.make tests/CMakeFiles/test_smoke.dir/build
 .PHONY : test_smoke/fast
 
+# Convenience name for target.
+tests/CMakeFiles/test_config.dir/rule:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_config.dir/rule
+.PHONY : tests/CMakeFiles/test_config.dir/rule
+
+# Convenience name for target.
+test_config: tests/CMakeFiles/test_config.dir/rule
+.PHONY : test_config
+
+# fast build rule for target.
+test_config/fast:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/build
+.PHONY : test_config/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_router.dir/rule:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_router.dir/rule
+.PHONY : tests/CMakeFiles/test_router.dir/rule
+
+# Convenience name for target.
+test_router: tests/CMakeFiles/test_router.dir/rule
+.PHONY : test_router
+
+# fast build rule for target.
+test_router/fast:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_router.dir/build.make tests/CMakeFiles/test_router.dir/build
+.PHONY : test_router/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_auth.dir/rule:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_auth.dir/rule
+.PHONY : tests/CMakeFiles/test_auth.dir/rule
+
+# Convenience name for target.
+test_auth: tests/CMakeFiles/test_auth.dir/rule
+.PHONY : test_auth
+
+# fast build rule for target.
+test_auth/fast:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_auth.dir/build.make tests/CMakeFiles/test_auth.dir/build
+.PHONY : test_auth/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_socks5.dir/rule:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_socks5.dir/rule
+.PHONY : tests/CMakeFiles/test_socks5.dir/rule
+
+# Convenience name for target.
+test_socks5: tests/CMakeFiles/test_socks5.dir/rule
+.PHONY : test_socks5
+
+# fast build rule for target.
+test_socks5/fast:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_socks5.dir/build.make tests/CMakeFiles/test_socks5.dir/build
+.PHONY : test_socks5/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_http_proxy.dir/rule:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_http_proxy.dir/rule
+.PHONY : tests/CMakeFiles/test_http_proxy.dir/rule
+
+# Convenience name for target.
+test_http_proxy: tests/CMakeFiles/test_http_proxy.dir/rule
+.PHONY : test_http_proxy
+
+# fast build rule for target.
+test_http_proxy/fast:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_http_proxy.dir/build.make tests/CMakeFiles/test_http_proxy.dir/build
+.PHONY : test_http_proxy/fast
+
+# Convenience name for target.
+tests/CMakeFiles/test_stats.dir/rule:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_stats.dir/rule
+.PHONY : tests/CMakeFiles/test_stats.dir/rule
+
+# Convenience name for target.
+test_stats: tests/CMakeFiles/test_stats.dir/rule
+.PHONY : test_stats
+
+# fast build rule for target.
+test_stats/fast:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/build
+.PHONY : test_stats/fast
+
+unit/test_auth.o: unit/test_auth.c.o
+.PHONY : unit/test_auth.o
+
+# target to build an object file
+unit/test_auth.c.o:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_auth.dir/build.make tests/CMakeFiles/test_auth.dir/unit/test_auth.c.o
+.PHONY : unit/test_auth.c.o
+
+unit/test_auth.i: unit/test_auth.c.i
+.PHONY : unit/test_auth.i
+
+# target to preprocess a source file
+unit/test_auth.c.i:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_auth.dir/build.make tests/CMakeFiles/test_auth.dir/unit/test_auth.c.i
+.PHONY : unit/test_auth.c.i
+
+unit/test_auth.s: unit/test_auth.c.s
+.PHONY : unit/test_auth.s
+
+# target to generate assembly for a file
+unit/test_auth.c.s:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_auth.dir/build.make tests/CMakeFiles/test_auth.dir/unit/test_auth.c.s
+.PHONY : unit/test_auth.c.s
+
+unit/test_config.o: unit/test_config.c.o
+.PHONY : unit/test_config.o
+
+# target to build an object file
+unit/test_config.c.o:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/unit/test_config.c.o
+.PHONY : unit/test_config.c.o
+
+unit/test_config.i: unit/test_config.c.i
+.PHONY : unit/test_config.i
+
+# target to preprocess a source file
+unit/test_config.c.i:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/unit/test_config.c.i
+.PHONY : unit/test_config.c.i
+
+unit/test_config.s: unit/test_config.c.s
+.PHONY : unit/test_config.s
+
+# target to generate assembly for a file
+unit/test_config.c.s:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/unit/test_config.c.s
+.PHONY : unit/test_config.c.s
+
+unit/test_http_proxy.o: unit/test_http_proxy.c.o
+.PHONY : unit/test_http_proxy.o
+
+# target to build an object file
+unit/test_http_proxy.c.o:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_http_proxy.dir/build.make tests/CMakeFiles/test_http_proxy.dir/unit/test_http_proxy.c.o
+.PHONY : unit/test_http_proxy.c.o
+
+unit/test_http_proxy.i: unit/test_http_proxy.c.i
+.PHONY : unit/test_http_proxy.i
+
+# target to preprocess a source file
+unit/test_http_proxy.c.i:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_http_proxy.dir/build.make tests/CMakeFiles/test_http_proxy.dir/unit/test_http_proxy.c.i
+.PHONY : unit/test_http_proxy.c.i
+
+unit/test_http_proxy.s: unit/test_http_proxy.c.s
+.PHONY : unit/test_http_proxy.s
+
+# target to generate assembly for a file
+unit/test_http_proxy.c.s:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_http_proxy.dir/build.make tests/CMakeFiles/test_http_proxy.dir/unit/test_http_proxy.c.s
+.PHONY : unit/test_http_proxy.c.s
+
+unit/test_router.o: unit/test_router.c.o
+.PHONY : unit/test_router.o
+
+# target to build an object file
+unit/test_router.c.o:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_router.dir/build.make tests/CMakeFiles/test_router.dir/unit/test_router.c.o
+.PHONY : unit/test_router.c.o
+
+unit/test_router.i: unit/test_router.c.i
+.PHONY : unit/test_router.i
+
+# target to preprocess a source file
+unit/test_router.c.i:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_router.dir/build.make tests/CMakeFiles/test_router.dir/unit/test_router.c.i
+.PHONY : unit/test_router.c.i
+
+unit/test_router.s: unit/test_router.c.s
+.PHONY : unit/test_router.s
+
+# target to generate assembly for a file
+unit/test_router.c.s:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_router.dir/build.make tests/CMakeFiles/test_router.dir/unit/test_router.c.s
+.PHONY : unit/test_router.c.s
+
 unit/test_smoke.o: unit/test_smoke.c.o
 .PHONY : unit/test_smoke.o
 
@@ -165,6 +345,54 @@ unit/test_smoke.c.s:
 	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_smoke.dir/build.make tests/CMakeFiles/test_smoke.dir/unit/test_smoke.c.s
 .PHONY : unit/test_smoke.c.s
 
+unit/test_socks5.o: unit/test_socks5.c.o
+.PHONY : unit/test_socks5.o
+
+# target to build an object file
+unit/test_socks5.c.o:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_socks5.dir/build.make tests/CMakeFiles/test_socks5.dir/unit/test_socks5.c.o
+.PHONY : unit/test_socks5.c.o
+
+unit/test_socks5.i: unit/test_socks5.c.i
+.PHONY : unit/test_socks5.i
+
+# target to preprocess a source file
+unit/test_socks5.c.i:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_socks5.dir/build.make tests/CMakeFiles/test_socks5.dir/unit/test_socks5.c.i
+.PHONY : unit/test_socks5.c.i
+
+unit/test_socks5.s: unit/test_socks5.c.s
+.PHONY : unit/test_socks5.s
+
+# target to generate assembly for a file
+unit/test_socks5.c.s:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_socks5.dir/build.make tests/CMakeFiles/test_socks5.dir/unit/test_socks5.c.s
+.PHONY : unit/test_socks5.c.s
+
+unit/test_stats.o: unit/test_stats.c.o
+.PHONY : unit/test_stats.o
+
+# target to build an object file
+unit/test_stats.c.o:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/unit/test_stats.c.o
+.PHONY : unit/test_stats.c.o
+
+unit/test_stats.i: unit/test_stats.c.i
+.PHONY : unit/test_stats.i
+
+# target to preprocess a source file
+unit/test_stats.c.i:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/unit/test_stats.c.i
+.PHONY : unit/test_stats.c.i
+
+unit/test_stats.s: unit/test_stats.c.s
+.PHONY : unit/test_stats.s
+
+# target to generate assembly for a file
+unit/test_stats.c.s:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/unit/test_stats.c.s
+.PHONY : unit/test_stats.c.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -174,10 +402,34 @@ help:
 	@echo "... edit_cache"
 	@echo "... rebuild_cache"
 	@echo "... test"
+	@echo "... test_auth"
+	@echo "... test_config"
+	@echo "... test_http_proxy"
+	@echo "... test_router"
 	@echo "... test_smoke"
+	@echo "... test_socks5"
+	@echo "... test_stats"
+	@echo "... unit/test_auth.o"
+	@echo "... unit/test_auth.i"
+	@echo "... unit/test_auth.s"
+	@echo "... unit/test_config.o"
+	@echo "... unit/test_config.i"
+	@echo "... unit/test_config.s"
+	@echo "... unit/test_http_proxy.o"
+	@echo "... unit/test_http_proxy.i"
+	@echo "... unit/test_http_proxy.s"
+	@echo "... unit/test_router.o"
+	@echo "... unit/test_router.i"
+	@echo "... unit/test_router.s"
 	@echo "... unit/test_smoke.o"
 	@echo "... unit/test_smoke.i"
 	@echo "... unit/test_smoke.s"
+	@echo "... unit/test_socks5.o"
+	@echo "... unit/test_socks5.i"
+	@echo "... unit/test_socks5.s"
+	@echo "... unit/test_stats.o"
+	@echo "... unit/test_stats.i"
+	@echo "... unit/test_stats.s"
 .PHONY : help
 
 

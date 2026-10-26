@@ -1,4 +1,5 @@
 tests/CMakeFiles/test_smoke.dir/unit/test_smoke.c.o: \
+  /Library/Developer/CommandLineTools/usr/lib/clang/21/share/asan_ignorelist.txt \
   /Users/kkito/proj/demo/rybaproxy/tests/unit/test_smoke.c \
   /Library/Developer/CommandLineTools/usr/lib/clang/21/include/stdarg.h \
   /Library/Developer/CommandLineTools/usr/lib/clang/21/include/__stdarg_header_macro.h \

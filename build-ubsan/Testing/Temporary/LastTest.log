@@ -1,0 +1,168 @@
+Start testing: Oct 26 09:12 CST
+----------------------------------------------------------
+1/7 Testing: test_smoke
+1/7 Test: test_smoke
+Command: "/Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/test_smoke"
+Directory: /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests
+"test_smoke" start time: Oct 26 09:12 CST
+Output:
+----------------------------------------------------------
+[==========] tests: Running 1 test(s).
+[ RUN      ] test_smoke
+[       OK ] test_smoke
+[==========] tests: 1 test(s) run.
+[  PASSED  ] 1 test(s).
+<end of output>
+Test time =   0.56 sec
+----------------------------------------------------------
+Test Passed.
+"test_smoke" end time: Oct 26 09:12 CST
+"test_smoke" time elapsed: 00:00:00
+----------------------------------------------------------
+
+2/7 Testing: test_config
+2/7 Test: test_config
+Command: "/Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/test_config"
+Directory: /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests
+"test_config" start time: Oct 26 09:12 CST
+Output:
+----------------------------------------------------------
+[==========] tests: Running 2 test(s).
+[ RUN      ] test_config_defaults
+[       OK ] test_config_defaults
+[ RUN      ] test_config_load
+[       OK ] test_config_load
+[==========] tests: 2 test(s) run.
+[  PASSED  ] 2 test(s).
+<end of output>
+Test time =   0.50 sec
+----------------------------------------------------------
+Test Passed.
+"test_config" end time: Oct 26 09:12 CST
+"test_config" time elapsed: 00:00:00
+----------------------------------------------------------
+
+3/7 Testing: test_router
+3/7 Test: test_router
+Command: "/Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/test_router"
+Directory: /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests
+"test_router" start time: Oct 26 09:12 CST
+Output:
+----------------------------------------------------------
+[==========] tests: Running 3 test(s).
+[ RUN      ] test_domain_wildcard
+[       OK ] test_domain_wildcard
+[ RUN      ] test_cidr
+[       OK ] test_cidr
+[ RUN      ] test_select
+[       OK ] test_select
+[==========] tests: 3 test(s) run.
+[  PASSED  ] 3 test(s).
+<end of output>
+Test time =   0.53 sec
+----------------------------------------------------------
+Test Passed.
+"test_router" end time: Oct 26 09:12 CST
+"test_router" time elapsed: 00:00:00
+----------------------------------------------------------
+
+4/7 Testing: test_auth
+4/7 Test: test_auth
+Command: "/Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/test_auth"
+Directory: /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests
+"test_auth" start time: Oct 26 09:12 CST
+Output:
+----------------------------------------------------------
+[==========] tests: Running 2 test(s).
+[ RUN      ] test_basic_ok
+/Users/kkito/proj/demo/rybaproxy/src/admin/auth.c:27:20: runtime error: left shift of 492624220 by 6 places cannot be represented in type 'int'
+    #0 0x000100930fa8 in base64_decode auth.c:27
+    #1 0x000100931530 in auth_basic_check auth.c:51
+    #2 0x000100925464 in test_basic_ok test_auth.c:8
+    #3 0x00010092edf8 in cmocka_run_one_test_or_fixture cmocka.c:4972
+    #4 0x00010092d604 in cmocka_run_one_tests cmocka.c:5088
+    #5 0x00010092cdbc in _cmocka_run_group_tests cmocka.c:5227
+    #6 0x0001009253f8 in main test_auth.c:27
+    #7 0x00018633c4e0 in start+0x1b4c (dyld:arm64e+0x204e0)
+
+SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /Users/kkito/proj/demo/rybaproxy/src/admin/auth.c:27:20 
+[       OK ] test_basic_ok
+[ RUN      ] test_base64
+[       OK ] test_base64
+[==========] tests: 2 test(s) run.
+[  PASSED  ] 2 test(s).
+<end of output>
+Test time =   0.63 sec
+----------------------------------------------------------
+Test Passed.
+"test_auth" end time: Oct 26 09:12 CST
+"test_auth" time elapsed: 00:00:00
+----------------------------------------------------------
+
+5/7 Testing: test_socks5
+5/7 Test: test_socks5
+Command: "/Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/test_socks5"
+Directory: /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests
+"test_socks5" start time: Oct 26 09:12 CST
+Output:
+----------------------------------------------------------
+[==========] tests: Running 3 test(s).
+[ RUN      ] test_parse_ipv4
+[       OK ] test_parse_ipv4
+[ RUN      ] test_parse_domain
+[       OK ] test_parse_domain
+[ RUN      ] test_reply
+[       OK ] test_reply
+[==========] tests: 3 test(s) run.
+[  PASSED  ] 3 test(s).
+<end of output>
+Test time =   0.58 sec
+----------------------------------------------------------
+Test Passed.
+"test_socks5" end time: Oct 26 09:12 CST
+"test_socks5" time elapsed: 00:00:00
+----------------------------------------------------------
+
+6/7 Testing: test_http_proxy
+6/7 Test: test_http_proxy
+Command: "/Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/test_http_proxy"
+Directory: /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests
+"test_http_proxy" start time: Oct 26 09:12 CST
+Output:
+----------------------------------------------------------
+[==========] tests: Running 2 test(s).
+[ RUN      ] test_connect
+[       OK ] test_connect
+[ RUN      ] test_get_absolute
+[       OK ] test_get_absolute
+[==========] tests: 2 test(s) run.
+[  PASSED  ] 2 test(s).
+<end of output>
+Test time =   0.55 sec
+----------------------------------------------------------
+Test Passed.
+"test_http_proxy" end time: Oct 26 09:12 CST
+"test_http_proxy" time elapsed: 00:00:00
+----------------------------------------------------------
+
+7/7 Testing: test_stats
+7/7 Test: test_stats
+Command: "/Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/test_stats"
+Directory: /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests
+"test_stats" start time: Oct 26 09:12 CST
+Output:
+----------------------------------------------------------
+[==========] tests: Running 1 test(s).
+[ RUN      ] test_counter
+[       OK ] test_counter
+[==========] tests: 1 test(s) run.
+[  PASSED  ] 1 test(s).
+<end of output>
+Test time =   0.49 sec
+----------------------------------------------------------
+Test Passed.
+"test_stats" end time: Oct 26 09:12 CST
+"test_stats" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 26 09:12 CST

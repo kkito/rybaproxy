@@ -168,6 +168,13 @@ set(CMAKE_MAKEFILE_PRODUCTS
 
 # Dependency information for all targets:
 set(CMAKE_DEPEND_INFO_FILES
+  "CMakeFiles/rybaproxy_core.dir/DependInfo.cmake"
   "CMakeFiles/rybaproxy.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_smoke.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_config.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_router.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_auth.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_socks5.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_http_proxy.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_stats.dir/DependInfo.cmake"
   )

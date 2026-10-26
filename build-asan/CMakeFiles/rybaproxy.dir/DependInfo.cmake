@@ -8,7 +8,6 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/Users/kkito/proj/demo/rybaproxy/src/core/log.c" "CMakeFiles/rybaproxy.dir/src/core/log.c.o" "gcc" "CMakeFiles/rybaproxy.dir/src/core/log.c.o.d"
   "/Users/kkito/proj/demo/rybaproxy/src/main.c" "CMakeFiles/rybaproxy.dir/src/main.c.o" "gcc" "CMakeFiles/rybaproxy.dir/src/main.c.o.d"
   )
 

@@ -4,9 +4,9 @@
 # compile C with /usr/bin/cc
 C_DEFINES = -DCMOCKA_STATIC
 
-C_INCLUDES = -isystem /Users/kkito/proj/demo/rybaproxy/build-asan/vcpkg_installed/arm64-osx/include
+C_INCLUDES = -I/Users/kkito/proj/demo/rybaproxy/include -I/Users/kkito/proj/demo/rybaproxy/third_party -isystem /Users/kkito/proj/demo/rybaproxy/build-asan/vcpkg_installed/arm64-osx/include
 
-C_FLAGSarm64 = -g -std=c11 -arch arm64
+C_FLAGSarm64 = -g -std=c11 -arch arm64 -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined
 
-C_FLAGS = -g -std=c11 -arch arm64
+C_FLAGS = -g -std=c11 -arch arm64 -fsanitize=address -fno-omit-frame-pointer -fsanitize=undefined
 

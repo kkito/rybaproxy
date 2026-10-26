@@ -1,0 +1,142 @@
+Detecting compiler hash for triplet arm64-osx...
+Compiler found: /Library/Developer/CommandLineTools/usr/bin/c++
+The following packages will be built and installed:
+    c-ares:arm64-osx@1.34.9
+    civetweb[core,ssl]:arm64-osx@1.16#2
+    cjson:arm64-osx@1.7.19
+    cmocka:arm64-osx@2.0.2
+    libevent[core,thread]:arm64-osx@2.1.12+20230128#2
+    llhttp:arm64-osx@9.3.1
+    openssl:arm64-osx@3.6.5#2
+    sqlite3[core,json1]:arm64-osx@3.54.1
+  * vcpkg-cmake:arm64-osx@2025-08-07
+  * vcpkg-cmake-config:arm64-osx@2026-07-21
+  * vcpkg-cmake-get-vars:arm64-osx@2025-05-29
+  * zlib:arm64-osx@1.3.2#2
+Additional packages (*) will be modified to complete this operation.
+Restored 12 package(s) from /Users/kkito/.cache/vcpkg/archives in 204 ms. Use --debug to see more details.
+Installing 1/12 vcpkg-cmake-config:arm64-osx@2026-07-21...
+vcpkg-cmake-config:arm64-osx@2026-07-21 package ABI: cc9f0e7ebc65b429c21ed14529e3fc5e709202aa9ccc4d547fc57d242eb92b58
+Elapsed time to handle vcpkg-cmake-config:arm64-osx: 1.63 ms
+Installing 2/12 vcpkg-cmake:arm64-osx@2025-08-07...
+vcpkg-cmake:arm64-osx@2025-08-07 package ABI: 170dda5f22b177543cac3b9b6b3f845dec51de74e34239617ff2aa05969f40d0
+Elapsed time to handle vcpkg-cmake:arm64-osx: 2.17 ms
+Installing 3/12 c-ares:arm64-osx@1.34.9...
+c-ares:arm64-osx@1.34.9 package ABI: d50fbc672413be01758b8c7693ec518d215a0322d413f0450ee674c64509ea70
+Elapsed time to handle c-ares:arm64-osx: 5.33 ms
+Installing 4/12 vcpkg-cmake-get-vars:arm64-osx@2025-05-29...
+vcpkg-cmake-get-vars:arm64-osx@2025-05-29 package ABI: 3cb0d46a1e2e86b99067e5d0bc16fe20ae39b05548fb6f6ecd915b9d50b12f9c
+Elapsed time to handle vcpkg-cmake-get-vars:arm64-osx: 2.2 ms
+Installing 5/12 openssl:arm64-osx@3.6.5#2...
+openssl:arm64-osx@3.6.5#2 package ABI: 2c62ea1129c26afe5dbffc34a724f138da619be10b3458170e1b09d22413de94
+Elapsed time to handle openssl:arm64-osx: 37.8 ms
+Installing 6/12 zlib:arm64-osx@1.3.2#2...
+zlib:arm64-osx@1.3.2#2 package ABI: 55d3cf3a2c68950d27ded3cf8279b92b0d5d927e175f649570b1771ddd7c8c7c
+Elapsed time to handle zlib:arm64-osx: 6.42 ms
+Installing 7/12 civetweb[core,ssl]:arm64-osx@1.16#2...
+civetweb[core,ssl]:arm64-osx@1.16#2 package ABI: 4e80b991e2853450f554048dccd13abce5242c22f6f1926857acd0da908c3368
+Elapsed time to handle civetweb:arm64-osx: 6.13 ms
+Installing 8/12 cjson:arm64-osx@1.7.19...
+cjson:arm64-osx@1.7.19 package ABI: 8b985f21d85f415beb4899d0006a3d0cc97345e26a34d0e450d1ac6a987f3d1c
+Elapsed time to handle cjson:arm64-osx: 4.04 ms
+Installing 9/12 cmocka:arm64-osx@2.0.2...
+cmocka:arm64-osx@2.0.2 package ABI: 7d64a398eb95cb63d9a7581e299ffc10eeaba93b456f17da3dd8739f9bd460e0
+Elapsed time to handle cmocka:arm64-osx: 4.54 ms
+Installing 10/12 libevent[core,thread]:arm64-osx@2.1.12+20230128#2...
+libevent[core,thread]:arm64-osx@2.1.12+20230128#2 package ABI: 8ebc6fec204c9ea2352224eba2296c978a940027f838b1d654a3a6344397484b
+Elapsed time to handle libevent:arm64-osx: 14.2 ms
+Installing 11/12 llhttp:arm64-osx@9.3.1...
+llhttp:arm64-osx@9.3.1 package ABI: cb1d9cd79c1925ec57e2ac7f99c82a1b545357833e3faef20d21e407bb64dfb5
+Elapsed time to handle llhttp:arm64-osx: 3.67 ms
+Installing 12/12 sqlite3[core,json1]:arm64-osx@3.54.1...
+sqlite3[core,json1]:arm64-osx@3.54.1 package ABI: 83182c534c877096a9e6e78003d1f7794774269827db861c4e6e945d64558ae1
+Elapsed time to handle sqlite3:arm64-osx: 5.06 ms
+Installed contents are licensed to you by owners. Microsoft is not responsible for, nor does it grant any licenses to, third-party packages.
+Some packages did not declare an SPDX license. Check the `copyright` file for each package for more information about their licensing.
+Packages installed in this vcpkg installation declare the following licenses:
+Apache-2.0
+BSD-3-Clause
+MIT
+Zlib
+blessing
+c-ares provides CMake targets:
+
+  find_package(c-ares CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE c-ares::cares)
+
+c-ares provides pkg-config modules:
+
+  # asynchronous DNS lookup library
+  libcares
+
+openssl is compatible with built-in CMake targets:
+
+  find_package(OpenSSL REQUIRED)
+  target_link_libraries(main PRIVATE OpenSSL::SSL)
+  target_link_libraries(main PRIVATE OpenSSL::Crypto)
+
+civetweb provides CMake targets:
+
+  find_package(civetweb CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE civetweb::civetweb)
+
+cjson provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(cJSON CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE cjson)
+
+cjson provides pkg-config modules:
+
+  # Ultralightweight JSON parser in ANSI C
+  libcjson
+
+cmocka provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(cmocka CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE cmocka::cmocka)
+
+cmocka provides pkg-config modules:
+
+  # The cmocka unit testing library
+  cmocka
+
+libevent provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(Libevent CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE libevent::core libevent::extra libevent::pthreads)
+
+libevent provides pkg-config modules:
+
+  # libevent is an asynchronous notification event loop library
+  libevent
+
+  # libevent_core
+  libevent_core
+
+  # libevent_extra
+  libevent_extra
+
+  # libevent_pthreads adds pthreads-based threading support to libevent
+  libevent_pthreads
+
+llhttp provides CMake targets:
+
+  # this is heuristically generated, and may not be correct
+  find_package(llhttp CONFIG REQUIRED)
+  target_link_libraries(main PRIVATE llhttp::llhttp_static)
+
+llhttp provides pkg-config modules:
+
+  # Node.js llhttp Library
+  libllhttp
+
+sqlite3 provides pkgconfig bindings.
+sqlite3 provides CMake targets:
+
+    find_package(unofficial-sqlite3 CONFIG REQUIRED)
+    target_link_libraries(main PRIVATE unofficial::sqlite3::sqlite3)
+
+All requested installations completed successfully in: 94.7 ms

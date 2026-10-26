@@ -1,6 +1,4 @@
 file(REMOVE_RECURSE
-  "CMakeFiles/rybaproxy.dir/src/core/log.c.o"
-  "CMakeFiles/rybaproxy.dir/src/core/log.c.o.d"
   "CMakeFiles/rybaproxy.dir/src/main.c.o"
   "CMakeFiles/rybaproxy.dir/src/main.c.o.d"
   "rybaproxy"

@@ -63,11 +63,13 @@ CMAKE_BINARY_DIR = /Users/kkito/proj/demo/rybaproxy/build-asan
 # Directory level rules for the build root directory
 
 # The main recursive "all" target.
+all: CMakeFiles/rybaproxy_core.dir/all
 all: CMakeFiles/rybaproxy.dir/all
 all: tests/all
 .PHONY : all
 
 # The main recursive "codegen" target.
+codegen: CMakeFiles/rybaproxy_core.dir/codegen
 codegen: CMakeFiles/rybaproxy.dir/codegen
 codegen: tests/codegen
 .PHONY : codegen
@@ -77,6 +79,7 @@ preinstall: tests/preinstall
 .PHONY : preinstall
 
 # The main recursive "clean" target.
+clean: CMakeFiles/rybaproxy_core.dir/clean
 clean: CMakeFiles/rybaproxy.dir/clean
 clean: tests/clean
 .PHONY : clean
@@ -86,10 +89,22 @@ clean: tests/clean
 
 # Recursive "all" directory target.
 tests/all: tests/CMakeFiles/test_smoke.dir/all
+tests/all: tests/CMakeFiles/test_config.dir/all
+tests/all: tests/CMakeFiles/test_router.dir/all
+tests/all: tests/CMakeFiles/test_auth.dir/all
+tests/all: tests/CMakeFiles/test_socks5.dir/all
+tests/all: tests/CMakeFiles/test_http_proxy.dir/all
+tests/all: tests/CMakeFiles/test_stats.dir/all
 .PHONY : tests/all
 
 # Recursive "codegen" directory target.
 tests/codegen: tests/CMakeFiles/test_smoke.dir/codegen
+tests/codegen: tests/CMakeFiles/test_config.dir/codegen
+tests/codegen: tests/CMakeFiles/test_router.dir/codegen
+tests/codegen: tests/CMakeFiles/test_auth.dir/codegen
+tests/codegen: tests/CMakeFiles/test_socks5.dir/codegen
+tests/codegen: tests/CMakeFiles/test_http_proxy.dir/codegen
+tests/codegen: tests/CMakeFiles/test_stats.dir/codegen
 .PHONY : tests/codegen
 
 # Recursive "preinstall" directory target.
@@ -98,21 +113,59 @@ tests/preinstall:
 
 # Recursive "clean" directory target.
 tests/clean: tests/CMakeFiles/test_smoke.dir/clean
+tests/clean: tests/CMakeFiles/test_config.dir/clean
+tests/clean: tests/CMakeFiles/test_router.dir/clean
+tests/clean: tests/CMakeFiles/test_auth.dir/clean
+tests/clean: tests/CMakeFiles/test_socks5.dir/clean
+tests/clean: tests/CMakeFiles/test_http_proxy.dir/clean
+tests/clean: tests/CMakeFiles/test_stats.dir/clean
 .PHONY : tests/clean
+
+#=============================================================================
+# Target rules for target CMakeFiles/rybaproxy_core.dir
+
+# All Build rule for target.
+CMakeFiles/rybaproxy_core.dir/all:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/depend
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=3,4,5,6,7,8,9,10,11,12,13,14 "Built target rybaproxy_core"
+.PHONY : CMakeFiles/rybaproxy_core.dir/all
+
+# Build rule for subdir invocation for target.
+CMakeFiles/rybaproxy_core.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 12
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/rybaproxy_core.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 0
+.PHONY : CMakeFiles/rybaproxy_core.dir/rule
+
+# Convenience name for target.
+rybaproxy_core: CMakeFiles/rybaproxy_core.dir/rule
+.PHONY : rybaproxy_core
+
+# codegen rule for target.
+CMakeFiles/rybaproxy_core.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=3,4,5,6,7,8,9,10,11,12,13,14 "Finished codegen for target rybaproxy_core"
+.PHONY : CMakeFiles/rybaproxy_core.dir/codegen
+
+# clean rule for target.
+CMakeFiles/rybaproxy_core.dir/clean:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/clean
+.PHONY : CMakeFiles/rybaproxy_core.dir/clean
 
 #=============================================================================
 # Target rules for target CMakeFiles/rybaproxy.dir
 
 # All Build rule for target.
-CMakeFiles/rybaproxy.dir/all:
+CMakeFiles/rybaproxy.dir/all: CMakeFiles/rybaproxy_core.dir/all
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy.dir/build.make CMakeFiles/rybaproxy.dir/depend
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy.dir/build.make CMakeFiles/rybaproxy.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=1,2,3 "Built target rybaproxy"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=1,2 "Built target rybaproxy"
 .PHONY : CMakeFiles/rybaproxy.dir/all
 
 # Build rule for subdir invocation for target.
 CMakeFiles/rybaproxy.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 3
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 14
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 CMakeFiles/rybaproxy.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 0
 .PHONY : CMakeFiles/rybaproxy.dir/rule
@@ -124,7 +177,7 @@ rybaproxy: CMakeFiles/rybaproxy.dir/rule
 # codegen rule for target.
 CMakeFiles/rybaproxy.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy.dir/build.make CMakeFiles/rybaproxy.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=1,2,3 "Finished codegen for target rybaproxy"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=1,2 "Finished codegen for target rybaproxy"
 .PHONY : CMakeFiles/rybaproxy.dir/codegen
 
 # clean rule for target.
@@ -136,15 +189,15 @@ CMakeFiles/rybaproxy.dir/clean:
 # Target rules for target tests/CMakeFiles/test_smoke.dir
 
 # All Build rule for target.
-tests/CMakeFiles/test_smoke.dir/all:
+tests/CMakeFiles/test_smoke.dir/all: CMakeFiles/rybaproxy_core.dir/all
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_smoke.dir/build.make tests/CMakeFiles/test_smoke.dir/depend
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_smoke.dir/build.make tests/CMakeFiles/test_smoke.dir/build
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=4,5 "Built target test_smoke"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=23,24 "Built target test_smoke"
 .PHONY : tests/CMakeFiles/test_smoke.dir/all
 
 # Build rule for subdir invocation for target.
 tests/CMakeFiles/test_smoke.dir/rule: cmake_check_build_system
-	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 2
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 14
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_smoke.dir/all
 	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 0
 .PHONY : tests/CMakeFiles/test_smoke.dir/rule
@@ -156,13 +209,205 @@ test_smoke: tests/CMakeFiles/test_smoke.dir/rule
 # codegen rule for target.
 tests/CMakeFiles/test_smoke.dir/codegen:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_smoke.dir/build.make tests/CMakeFiles/test_smoke.dir/codegen
-	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=4,5 "Finished codegen for target test_smoke"
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=23,24 "Finished codegen for target test_smoke"
 .PHONY : tests/CMakeFiles/test_smoke.dir/codegen
 
 # clean rule for target.
 tests/CMakeFiles/test_smoke.dir/clean:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_smoke.dir/build.make tests/CMakeFiles/test_smoke.dir/clean
 .PHONY : tests/CMakeFiles/test_smoke.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_config.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_config.dir/all: CMakeFiles/rybaproxy_core.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=17,18 "Built target test_config"
+.PHONY : tests/CMakeFiles/test_config.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_config.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 14
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_config.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_config.dir/rule
+
+# Convenience name for target.
+test_config: tests/CMakeFiles/test_config.dir/rule
+.PHONY : test_config
+
+# codegen rule for target.
+tests/CMakeFiles/test_config.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=17,18 "Finished codegen for target test_config"
+.PHONY : tests/CMakeFiles/test_config.dir/codegen
+
+# clean rule for target.
+tests/CMakeFiles/test_config.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/clean
+.PHONY : tests/CMakeFiles/test_config.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_router.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_router.dir/all: CMakeFiles/rybaproxy_core.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_router.dir/build.make tests/CMakeFiles/test_router.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_router.dir/build.make tests/CMakeFiles/test_router.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=21,22 "Built target test_router"
+.PHONY : tests/CMakeFiles/test_router.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_router.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 14
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_router.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_router.dir/rule
+
+# Convenience name for target.
+test_router: tests/CMakeFiles/test_router.dir/rule
+.PHONY : test_router
+
+# codegen rule for target.
+tests/CMakeFiles/test_router.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_router.dir/build.make tests/CMakeFiles/test_router.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=21,22 "Finished codegen for target test_router"
+.PHONY : tests/CMakeFiles/test_router.dir/codegen
+
+# clean rule for target.
+tests/CMakeFiles/test_router.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_router.dir/build.make tests/CMakeFiles/test_router.dir/clean
+.PHONY : tests/CMakeFiles/test_router.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_auth.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_auth.dir/all: CMakeFiles/rybaproxy_core.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_auth.dir/build.make tests/CMakeFiles/test_auth.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_auth.dir/build.make tests/CMakeFiles/test_auth.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=15,16 "Built target test_auth"
+.PHONY : tests/CMakeFiles/test_auth.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_auth.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 14
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_auth.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_auth.dir/rule
+
+# Convenience name for target.
+test_auth: tests/CMakeFiles/test_auth.dir/rule
+.PHONY : test_auth
+
+# codegen rule for target.
+tests/CMakeFiles/test_auth.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_auth.dir/build.make tests/CMakeFiles/test_auth.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=15,16 "Finished codegen for target test_auth"
+.PHONY : tests/CMakeFiles/test_auth.dir/codegen
+
+# clean rule for target.
+tests/CMakeFiles/test_auth.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_auth.dir/build.make tests/CMakeFiles/test_auth.dir/clean
+.PHONY : tests/CMakeFiles/test_auth.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_socks5.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_socks5.dir/all: CMakeFiles/rybaproxy_core.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_socks5.dir/build.make tests/CMakeFiles/test_socks5.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_socks5.dir/build.make tests/CMakeFiles/test_socks5.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=25,26 "Built target test_socks5"
+.PHONY : tests/CMakeFiles/test_socks5.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_socks5.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 14
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_socks5.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_socks5.dir/rule
+
+# Convenience name for target.
+test_socks5: tests/CMakeFiles/test_socks5.dir/rule
+.PHONY : test_socks5
+
+# codegen rule for target.
+tests/CMakeFiles/test_socks5.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_socks5.dir/build.make tests/CMakeFiles/test_socks5.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=25,26 "Finished codegen for target test_socks5"
+.PHONY : tests/CMakeFiles/test_socks5.dir/codegen
+
+# clean rule for target.
+tests/CMakeFiles/test_socks5.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_socks5.dir/build.make tests/CMakeFiles/test_socks5.dir/clean
+.PHONY : tests/CMakeFiles/test_socks5.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_http_proxy.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_http_proxy.dir/all: CMakeFiles/rybaproxy_core.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_http_proxy.dir/build.make tests/CMakeFiles/test_http_proxy.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_http_proxy.dir/build.make tests/CMakeFiles/test_http_proxy.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=19,20 "Built target test_http_proxy"
+.PHONY : tests/CMakeFiles/test_http_proxy.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_http_proxy.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 14
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_http_proxy.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_http_proxy.dir/rule
+
+# Convenience name for target.
+test_http_proxy: tests/CMakeFiles/test_http_proxy.dir/rule
+.PHONY : test_http_proxy
+
+# codegen rule for target.
+tests/CMakeFiles/test_http_proxy.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_http_proxy.dir/build.make tests/CMakeFiles/test_http_proxy.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=19,20 "Finished codegen for target test_http_proxy"
+.PHONY : tests/CMakeFiles/test_http_proxy.dir/codegen
+
+# clean rule for target.
+tests/CMakeFiles/test_http_proxy.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_http_proxy.dir/build.make tests/CMakeFiles/test_http_proxy.dir/clean
+.PHONY : tests/CMakeFiles/test_http_proxy.dir/clean
+
+#=============================================================================
+# Target rules for target tests/CMakeFiles/test_stats.dir
+
+# All Build rule for target.
+tests/CMakeFiles/test_stats.dir/all: CMakeFiles/rybaproxy_core.dir/all
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/depend
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/build
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=27,28 "Built target test_stats"
+.PHONY : tests/CMakeFiles/test_stats.dir/all
+
+# Build rule for subdir invocation for target.
+tests/CMakeFiles/test_stats.dir/rule: cmake_check_build_system
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 14
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_stats.dir/all
+	$(CMAKE_COMMAND) -E cmake_progress_start /Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles 0
+.PHONY : tests/CMakeFiles/test_stats.dir/rule
+
+# Convenience name for target.
+test_stats: tests/CMakeFiles/test_stats.dir/rule
+.PHONY : test_stats
+
+# codegen rule for target.
+tests/CMakeFiles/test_stats.dir/codegen:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/codegen
+	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=27,28 "Finished codegen for target test_stats"
+.PHONY : tests/CMakeFiles/test_stats.dir/codegen
+
+# clean rule for target.
+tests/CMakeFiles/test_stats.dir/clean:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/clean
+.PHONY : tests/CMakeFiles/test_stats.dir/clean
 
 #=============================================================================
 # Special targets to cleanup operation of make.

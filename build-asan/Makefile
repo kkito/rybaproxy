@@ -128,6 +128,19 @@ depend:
 .PHONY : depend
 
 #=============================================================================
+# Target rules for targets named rybaproxy_core
+
+# Build rule for target.
+rybaproxy_core: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 rybaproxy_core
+.PHONY : rybaproxy_core
+
+# fast build rule for target.
+rybaproxy_core/fast:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/build
+.PHONY : rybaproxy_core/fast
+
+#=============================================================================
 # Target rules for targets named rybaproxy
 
 # Build rule for target.
@@ -153,12 +166,138 @@ test_smoke/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_smoke.dir/build.make tests/CMakeFiles/test_smoke.dir/build
 .PHONY : test_smoke/fast
 
+#=============================================================================
+# Target rules for targets named test_config
+
+# Build rule for target.
+test_config: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_config
+.PHONY : test_config
+
+# fast build rule for target.
+test_config/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/build
+.PHONY : test_config/fast
+
+#=============================================================================
+# Target rules for targets named test_router
+
+# Build rule for target.
+test_router: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_router
+.PHONY : test_router
+
+# fast build rule for target.
+test_router/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_router.dir/build.make tests/CMakeFiles/test_router.dir/build
+.PHONY : test_router/fast
+
+#=============================================================================
+# Target rules for targets named test_auth
+
+# Build rule for target.
+test_auth: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_auth
+.PHONY : test_auth
+
+# fast build rule for target.
+test_auth/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_auth.dir/build.make tests/CMakeFiles/test_auth.dir/build
+.PHONY : test_auth/fast
+
+#=============================================================================
+# Target rules for targets named test_socks5
+
+# Build rule for target.
+test_socks5: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_socks5
+.PHONY : test_socks5
+
+# fast build rule for target.
+test_socks5/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_socks5.dir/build.make tests/CMakeFiles/test_socks5.dir/build
+.PHONY : test_socks5/fast
+
+#=============================================================================
+# Target rules for targets named test_http_proxy
+
+# Build rule for target.
+test_http_proxy: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_http_proxy
+.PHONY : test_http_proxy
+
+# fast build rule for target.
+test_http_proxy/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_http_proxy.dir/build.make tests/CMakeFiles/test_http_proxy.dir/build
+.PHONY : test_http_proxy/fast
+
+#=============================================================================
+# Target rules for targets named test_stats
+
+# Build rule for target.
+test_stats: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_stats
+.PHONY : test_stats
+
+# fast build rule for target.
+test_stats/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/build
+.PHONY : test_stats/fast
+
+src/admin/auth.o: src/admin/auth.c.o
+.PHONY : src/admin/auth.o
+
+# target to build an object file
+src/admin/auth.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/admin/auth.c.o
+.PHONY : src/admin/auth.c.o
+
+src/admin/auth.i: src/admin/auth.c.i
+.PHONY : src/admin/auth.i
+
+# target to preprocess a source file
+src/admin/auth.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/admin/auth.c.i
+.PHONY : src/admin/auth.c.i
+
+src/admin/auth.s: src/admin/auth.c.s
+.PHONY : src/admin/auth.s
+
+# target to generate assembly for a file
+src/admin/auth.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/admin/auth.c.s
+.PHONY : src/admin/auth.c.s
+
+src/core/config.o: src/core/config.c.o
+.PHONY : src/core/config.o
+
+# target to build an object file
+src/core/config.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/core/config.c.o
+.PHONY : src/core/config.c.o
+
+src/core/config.i: src/core/config.c.i
+.PHONY : src/core/config.i
+
+# target to preprocess a source file
+src/core/config.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/core/config.c.i
+.PHONY : src/core/config.c.i
+
+src/core/config.s: src/core/config.c.s
+.PHONY : src/core/config.s
+
+# target to generate assembly for a file
+src/core/config.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/core/config.c.s
+.PHONY : src/core/config.c.s
+
 src/core/log.o: src/core/log.c.o
 .PHONY : src/core/log.o
 
 # target to build an object file
 src/core/log.c.o:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy.dir/build.make CMakeFiles/rybaproxy.dir/src/core/log.c.o
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/core/log.c.o
 .PHONY : src/core/log.c.o
 
 src/core/log.i: src/core/log.c.i
@@ -166,7 +305,7 @@ src/core/log.i: src/core/log.c.i
 
 # target to preprocess a source file
 src/core/log.c.i:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy.dir/build.make CMakeFiles/rybaproxy.dir/src/core/log.c.i
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/core/log.c.i
 .PHONY : src/core/log.c.i
 
 src/core/log.s: src/core/log.c.s
@@ -174,7 +313,7 @@ src/core/log.s: src/core/log.c.s
 
 # target to generate assembly for a file
 src/core/log.c.s:
-	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy.dir/build.make CMakeFiles/rybaproxy.dir/src/core/log.c.s
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/core/log.c.s
 .PHONY : src/core/log.c.s
 
 src/main.o: src/main.c.o
@@ -201,6 +340,198 @@ src/main.c.s:
 	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy.dir/build.make CMakeFiles/rybaproxy.dir/src/main.c.s
 .PHONY : src/main.c.s
 
+src/proxy/http_proxy.o: src/proxy/http_proxy.c.o
+.PHONY : src/proxy/http_proxy.o
+
+# target to build an object file
+src/proxy/http_proxy.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.o
+.PHONY : src/proxy/http_proxy.c.o
+
+src/proxy/http_proxy.i: src/proxy/http_proxy.c.i
+.PHONY : src/proxy/http_proxy.i
+
+# target to preprocess a source file
+src/proxy/http_proxy.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.i
+.PHONY : src/proxy/http_proxy.c.i
+
+src/proxy/http_proxy.s: src/proxy/http_proxy.c.s
+.PHONY : src/proxy/http_proxy.s
+
+# target to generate assembly for a file
+src/proxy/http_proxy.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/http_proxy.c.s
+.PHONY : src/proxy/http_proxy.c.s
+
+src/proxy/relay.o: src/proxy/relay.c.o
+.PHONY : src/proxy/relay.o
+
+# target to build an object file
+src/proxy/relay.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.o
+.PHONY : src/proxy/relay.c.o
+
+src/proxy/relay.i: src/proxy/relay.c.i
+.PHONY : src/proxy/relay.i
+
+# target to preprocess a source file
+src/proxy/relay.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.i
+.PHONY : src/proxy/relay.c.i
+
+src/proxy/relay.s: src/proxy/relay.c.s
+.PHONY : src/proxy/relay.s
+
+# target to generate assembly for a file
+src/proxy/relay.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/relay.c.s
+.PHONY : src/proxy/relay.c.s
+
+src/proxy/server.o: src/proxy/server.c.o
+.PHONY : src/proxy/server.o
+
+# target to build an object file
+src/proxy/server.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.o
+.PHONY : src/proxy/server.c.o
+
+src/proxy/server.i: src/proxy/server.c.i
+.PHONY : src/proxy/server.i
+
+# target to preprocess a source file
+src/proxy/server.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.i
+.PHONY : src/proxy/server.c.i
+
+src/proxy/server.s: src/proxy/server.c.s
+.PHONY : src/proxy/server.s
+
+# target to generate assembly for a file
+src/proxy/server.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/server.c.s
+.PHONY : src/proxy/server.c.s
+
+src/proxy/session.o: src/proxy/session.c.o
+.PHONY : src/proxy/session.o
+
+# target to build an object file
+src/proxy/session.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.o
+.PHONY : src/proxy/session.c.o
+
+src/proxy/session.i: src/proxy/session.c.i
+.PHONY : src/proxy/session.i
+
+# target to preprocess a source file
+src/proxy/session.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.i
+.PHONY : src/proxy/session.c.i
+
+src/proxy/session.s: src/proxy/session.c.s
+.PHONY : src/proxy/session.s
+
+# target to generate assembly for a file
+src/proxy/session.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/session.c.s
+.PHONY : src/proxy/session.c.s
+
+src/proxy/socks5.o: src/proxy/socks5.c.o
+.PHONY : src/proxy/socks5.o
+
+# target to build an object file
+src/proxy/socks5.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.o
+.PHONY : src/proxy/socks5.c.o
+
+src/proxy/socks5.i: src/proxy/socks5.c.i
+.PHONY : src/proxy/socks5.i
+
+# target to preprocess a source file
+src/proxy/socks5.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.i
+.PHONY : src/proxy/socks5.c.i
+
+src/proxy/socks5.s: src/proxy/socks5.c.s
+.PHONY : src/proxy/socks5.s
+
+# target to generate assembly for a file
+src/proxy/socks5.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/proxy/socks5.c.s
+.PHONY : src/proxy/socks5.c.s
+
+src/router/router.o: src/router/router.c.o
+.PHONY : src/router/router.o
+
+# target to build an object file
+src/router/router.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/router/router.c.o
+.PHONY : src/router/router.c.o
+
+src/router/router.i: src/router/router.c.i
+.PHONY : src/router/router.i
+
+# target to preprocess a source file
+src/router/router.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/router/router.c.i
+.PHONY : src/router/router.c.i
+
+src/router/router.s: src/router/router.c.s
+.PHONY : src/router/router.s
+
+# target to generate assembly for a file
+src/router/router.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/router/router.c.s
+.PHONY : src/router/router.c.s
+
+src/stats/stats.o: src/stats/stats.c.o
+.PHONY : src/stats/stats.o
+
+# target to build an object file
+src/stats/stats.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.o
+.PHONY : src/stats/stats.c.o
+
+src/stats/stats.i: src/stats/stats.c.i
+.PHONY : src/stats/stats.i
+
+# target to preprocess a source file
+src/stats/stats.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.i
+.PHONY : src/stats/stats.c.i
+
+src/stats/stats.s: src/stats/stats.c.s
+.PHONY : src/stats/stats.s
+
+# target to generate assembly for a file
+src/stats/stats.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/stats/stats.c.s
+.PHONY : src/stats/stats.c.s
+
+src/upstream/upstream.o: src/upstream/upstream.c.o
+.PHONY : src/upstream/upstream.o
+
+# target to build an object file
+src/upstream/upstream.c.o:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.o
+.PHONY : src/upstream/upstream.c.o
+
+src/upstream/upstream.i: src/upstream/upstream.c.i
+.PHONY : src/upstream/upstream.i
+
+# target to preprocess a source file
+src/upstream/upstream.c.i:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.i
+.PHONY : src/upstream/upstream.c.i
+
+src/upstream/upstream.s: src/upstream/upstream.c.s
+.PHONY : src/upstream/upstream.s
+
+# target to generate assembly for a file
+src/upstream/upstream.c.s:
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/rybaproxy_core.dir/build.make CMakeFiles/rybaproxy_core.dir/src/upstream/upstream.c.s
+.PHONY : src/upstream/upstream.c.s
+
 # Help Target
 help:
 	@echo "The following are some of the valid targets for this Makefile:"
@@ -211,13 +542,50 @@ help:
 	@echo "... rebuild_cache"
 	@echo "... test"
 	@echo "... rybaproxy"
+	@echo "... rybaproxy_core"
+	@echo "... test_auth"
+	@echo "... test_config"
+	@echo "... test_http_proxy"
+	@echo "... test_router"
 	@echo "... test_smoke"
+	@echo "... test_socks5"
+	@echo "... test_stats"
+	@echo "... src/admin/auth.o"
+	@echo "... src/admin/auth.i"
+	@echo "... src/admin/auth.s"
+	@echo "... src/core/config.o"
+	@echo "... src/core/config.i"
+	@echo "... src/core/config.s"
 	@echo "... src/core/log.o"
 	@echo "... src/core/log.i"
 	@echo "... src/core/log.s"
 	@echo "... src/main.o"
 	@echo "... src/main.i"
 	@echo "... src/main.s"
+	@echo "... src/proxy/http_proxy.o"
+	@echo "... src/proxy/http_proxy.i"
+	@echo "... src/proxy/http_proxy.s"
+	@echo "... src/proxy/relay.o"
+	@echo "... src/proxy/relay.i"
+	@echo "... src/proxy/relay.s"
+	@echo "... src/proxy/server.o"
+	@echo "... src/proxy/server.i"
+	@echo "... src/proxy/server.s"
+	@echo "... src/proxy/session.o"
+	@echo "... src/proxy/session.i"
+	@echo "... src/proxy/session.s"
+	@echo "... src/proxy/socks5.o"
+	@echo "... src/proxy/socks5.i"
+	@echo "... src/proxy/socks5.s"
+	@echo "... src/router/router.o"
+	@echo "... src/router/router.i"
+	@echo "... src/router/router.s"
+	@echo "... src/stats/stats.o"
+	@echo "... src/stats/stats.i"
+	@echo "... src/stats/stats.s"
+	@echo "... src/upstream/upstream.o"
+	@echo "... src/upstream/upstream.i"
+	@echo "... src/upstream/upstream.s"
 .PHONY : help
 
 

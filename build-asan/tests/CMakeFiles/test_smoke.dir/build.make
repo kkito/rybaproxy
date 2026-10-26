@@ -96,6 +96,20 @@ test_smoke_EXTERNAL_OBJECTS =
 tests/test_smoke: tests/CMakeFiles/test_smoke.dir/unit/test_smoke.c.o
 tests/test_smoke: tests/CMakeFiles/test_smoke.dir/build.make
 tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libcmocka.a
+tests/test_smoke: librybaproxy_core.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libevent_extrad.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libevent_pthreadsd.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libevent_cored.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libssl.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libcrypto.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libsqlite3.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libcjson.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libcivetweb.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libssl.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libcrypto.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libz.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libllhttp.a
+tests/test_smoke: vcpkg_installed/arm64-osx/debug/lib/libcares.a
 tests/test_smoke: tests/CMakeFiles/test_smoke.dir/link.txt
 	@$(CMAKE_COMMAND) -E cmake_echo_color "--switch=$(COLOR)" --green --bold --progress-dir=/Users/kkito/proj/demo/rybaproxy/build-asan/CMakeFiles --progress-num=$(CMAKE_PROGRESS_2) "Linking C executable test_smoke"
 	cd /Users/kkito/proj/demo/rybaproxy/build-asan/tests && $(CMAKE_COMMAND) -E cmake_link_script CMakeFiles/test_smoke.dir/link.txt --verbose=$(VERBOSE)

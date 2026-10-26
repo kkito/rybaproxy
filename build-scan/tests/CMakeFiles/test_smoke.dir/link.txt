@@ -1,1 +1,0 @@
-/opt/homebrew/Cellar/llvm/23.1.4/libexec/ccc-analyzer -g -arch arm64 -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/test_smoke.dir/unit/test_smoke.c.o -o test_smoke  ../vcpkg_installed/arm64-osx/debug/lib/libcmocka.a

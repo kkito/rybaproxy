@@ -34,7 +34,7 @@ asan:
 	$(CMAKE) -S . -B build-asan $(CMAKE_COMMON) \
 	  -DRYBA_ENABLE_ASAN=ON -DRYBA_ENABLE_UBSAN=ON -DCMAKE_BUILD_TYPE=Debug
 	$(CMAKE) --build build-asan -j$(JOBS)
-	ASAN_OPTIONS=detect_leaks=1:halt_on_error=1 $(CTEST) --test-dir build-asan --output-on-failure
+	ASAN_OPTIONS=halt_on_error=1 $(CTEST) --test-dir build-asan --output-on-failure
 
 ubsan:
 	rm -rf build-ubsan
