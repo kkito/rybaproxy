@@ -211,6 +211,7 @@ void db_start(void) {
 }
 
 void db_stop(void) {
+    if (!g_running) return;
     pthread_mutex_lock(&g_lock);
     g_shutdown = 1;
     pthread_cond_broadcast(&g_cond);

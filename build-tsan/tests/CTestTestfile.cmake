@@ -18,3 +18,5 @@ add_test("test_http_proxy" "/Users/kkito/proj/demo/rybaproxy/build-tsan/tests/te
 set_tests_properties("test_http_proxy" PROPERTIES  _BACKTRACE_TRIPLES "/Users/kkito/proj/demo/rybaproxy/tests/CMakeLists.txt;7;add_test;/Users/kkito/proj/demo/rybaproxy/tests/CMakeLists.txt;15;add_ryba_test;/Users/kkito/proj/demo/rybaproxy/tests/CMakeLists.txt;0;")
 add_test("test_stats" "/Users/kkito/proj/demo/rybaproxy/build-tsan/tests/test_stats")
 set_tests_properties("test_stats" PROPERTIES  _BACKTRACE_TRIPLES "/Users/kkito/proj/demo/rybaproxy/tests/CMakeLists.txt;7;add_test;/Users/kkito/proj/demo/rybaproxy/tests/CMakeLists.txt;16;add_ryba_test;/Users/kkito/proj/demo/rybaproxy/tests/CMakeLists.txt;0;")
+add_test("test_db" "/Users/kkito/proj/demo/rybaproxy/build-tsan/tests/test_db")
+set_tests_properties("test_db" PROPERTIES  _BACKTRACE_TRIPLES "/Users/kkito/proj/demo/rybaproxy/tests/CMakeLists.txt;7;add_test;/Users/kkito/proj/demo/rybaproxy/tests/CMakeLists.txt;17;add_ryba_test;/Users/kkito/proj/demo/rybaproxy/tests/CMakeLists.txt;0;")

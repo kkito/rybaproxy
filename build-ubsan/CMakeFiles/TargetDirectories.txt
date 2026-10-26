@@ -10,6 +10,7 @@
 /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/CMakeFiles/test_socks5.dir
 /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/CMakeFiles/test_http_proxy.dir
 /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/CMakeFiles/test_stats.dir
+/Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/CMakeFiles/test_db.dir
 /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/CMakeFiles/test.dir
 /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/CMakeFiles/edit_cache.dir
 /Users/kkito/proj/demo/rybaproxy/build-ubsan/tests/CMakeFiles/rebuild_cache.dir

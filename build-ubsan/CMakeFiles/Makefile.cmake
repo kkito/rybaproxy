@@ -177,4 +177,5 @@ set(CMAKE_DEPEND_INFO_FILES
   "tests/CMakeFiles/test_socks5.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_http_proxy.dir/DependInfo.cmake"
   "tests/CMakeFiles/test_stats.dir/DependInfo.cmake"
+  "tests/CMakeFiles/test_db.dir/DependInfo.cmake"
   )

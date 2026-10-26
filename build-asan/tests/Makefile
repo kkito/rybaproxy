@@ -225,6 +225,20 @@ test_stats/fast:
 	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/build
 .PHONY : test_stats/fast
 
+# Convenience name for target.
+tests/CMakeFiles/test_db.dir/rule:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 tests/CMakeFiles/test_db.dir/rule
+.PHONY : tests/CMakeFiles/test_db.dir/rule
+
+# Convenience name for target.
+test_db: tests/CMakeFiles/test_db.dir/rule
+.PHONY : test_db
+
+# fast build rule for target.
+test_db/fast:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_db.dir/build.make tests/CMakeFiles/test_db.dir/build
+.PHONY : test_db/fast
+
 unit/test_auth.o: unit/test_auth.c.o
 .PHONY : unit/test_auth.o
 
@@ -272,6 +286,30 @@ unit/test_config.s: unit/test_config.c.s
 unit/test_config.c.s:
 	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_config.dir/build.make tests/CMakeFiles/test_config.dir/unit/test_config.c.s
 .PHONY : unit/test_config.c.s
+
+unit/test_db.o: unit/test_db.c.o
+.PHONY : unit/test_db.o
+
+# target to build an object file
+unit/test_db.c.o:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_db.dir/build.make tests/CMakeFiles/test_db.dir/unit/test_db.c.o
+.PHONY : unit/test_db.c.o
+
+unit/test_db.i: unit/test_db.c.i
+.PHONY : unit/test_db.i
+
+# target to preprocess a source file
+unit/test_db.c.i:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_db.dir/build.make tests/CMakeFiles/test_db.dir/unit/test_db.c.i
+.PHONY : unit/test_db.c.i
+
+unit/test_db.s: unit/test_db.c.s
+.PHONY : unit/test_db.s
+
+# target to generate assembly for a file
+unit/test_db.c.s:
+	cd /Users/kkito/proj/demo/rybaproxy/build-asan && $(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_db.dir/build.make tests/CMakeFiles/test_db.dir/unit/test_db.c.s
+.PHONY : unit/test_db.c.s
 
 unit/test_http_proxy.o: unit/test_http_proxy.c.o
 .PHONY : unit/test_http_proxy.o
@@ -404,6 +442,7 @@ help:
 	@echo "... test"
 	@echo "... test_auth"
 	@echo "... test_config"
+	@echo "... test_db"
 	@echo "... test_http_proxy"
 	@echo "... test_router"
 	@echo "... test_smoke"
@@ -415,6 +454,9 @@ help:
 	@echo "... unit/test_config.o"
 	@echo "... unit/test_config.i"
 	@echo "... unit/test_config.s"
+	@echo "... unit/test_db.o"
+	@echo "... unit/test_db.i"
+	@echo "... unit/test_db.s"
 	@echo "... unit/test_http_proxy.o"
 	@echo "... unit/test_http_proxy.i"
 	@echo "... unit/test_http_proxy.s"

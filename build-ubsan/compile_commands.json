@@ -124,5 +124,11 @@
   "command": "/usr/bin/cc -DCMOCKA_STATIC -I/Users/kkito/proj/demo/rybaproxy/include -I/Users/kkito/proj/demo/rybaproxy/third_party -isystem /Users/kkito/proj/demo/rybaproxy/build-ubsan/vcpkg_installed/arm64-osx/include -g -std=c11 -arch arm64 -fsanitize=undefined -fno-omit-frame-pointer -o CMakeFiles/test_stats.dir/unit/test_stats.c.o -c /Users/kkito/proj/demo/rybaproxy/tests/unit/test_stats.c",
   "file": "/Users/kkito/proj/demo/rybaproxy/tests/unit/test_stats.c",
   "output": "tests/CMakeFiles/test_stats.dir/unit/test_stats.c.o"
+},
+{
+  "directory": "/Users/kkito/proj/demo/rybaproxy/build-ubsan/tests",
+  "command": "/usr/bin/cc -DCMOCKA_STATIC -I/Users/kkito/proj/demo/rybaproxy/include -I/Users/kkito/proj/demo/rybaproxy/third_party -isystem /Users/kkito/proj/demo/rybaproxy/build-ubsan/vcpkg_installed/arm64-osx/include -g -std=c11 -arch arm64 -fsanitize=undefined -fno-omit-frame-pointer -o CMakeFiles/test_db.dir/unit/test_db.c.o -c /Users/kkito/proj/demo/rybaproxy/tests/unit/test_db.c",
+  "file": "/Users/kkito/proj/demo/rybaproxy/tests/unit/test_db.c",
+  "output": "tests/CMakeFiles/test_db.dir/unit/test_db.c.o"
 }
 ]

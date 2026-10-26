@@ -1,10 +1,10 @@
-Start testing: Oct 26 09:19 CST
+Start testing: Oct 26 09:21 CST
 ----------------------------------------------------------
-1/7 Testing: test_smoke
-1/7 Test: test_smoke
+1/8 Testing: test_smoke
+1/8 Test: test_smoke
 Command: "/Users/kkito/proj/demo/rybaproxy/build-asan/tests/test_smoke"
 Directory: /Users/kkito/proj/demo/rybaproxy/build-asan/tests
-"test_smoke" start time: Oct 26 09:19 CST
+"test_smoke" start time: Oct 26 09:21 CST
 Output:
 ----------------------------------------------------------
 [==========] tests: Running 1 test(s).
@@ -13,18 +13,18 @@ Output:
 [==========] tests: 1 test(s) run.
 [  PASSED  ] 1 test(s).
 <end of output>
-Test time =   0.67 sec
+Test time =   0.66 sec
 ----------------------------------------------------------
 Test Passed.
-"test_smoke" end time: Oct 26 09:19 CST
+"test_smoke" end time: Oct 26 09:21 CST
 "test_smoke" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-2/7 Testing: test_config
-2/7 Test: test_config
+2/8 Testing: test_config
+2/8 Test: test_config
 Command: "/Users/kkito/proj/demo/rybaproxy/build-asan/tests/test_config"
 Directory: /Users/kkito/proj/demo/rybaproxy/build-asan/tests
-"test_config" start time: Oct 26 09:19 CST
+"test_config" start time: Oct 26 09:21 CST
 Output:
 ----------------------------------------------------------
 [==========] tests: Running 2 test(s).
@@ -35,42 +35,46 @@ Output:
 [==========] tests: 2 test(s) run.
 [  PASSED  ] 2 test(s).
 <end of output>
-Test time =   0.67 sec
+Test time =   0.60 sec
 ----------------------------------------------------------
 Test Passed.
-"test_config" end time: Oct 26 09:19 CST
+"test_config" end time: Oct 26 09:21 CST
 "test_config" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-3/7 Testing: test_router
-3/7 Test: test_router
+3/8 Testing: test_router
+3/8 Test: test_router
 Command: "/Users/kkito/proj/demo/rybaproxy/build-asan/tests/test_router"
 Directory: /Users/kkito/proj/demo/rybaproxy/build-asan/tests
-"test_router" start time: Oct 26 09:19 CST
+"test_router" start time: Oct 26 09:21 CST
 Output:
 ----------------------------------------------------------
-[==========] tests: Running 3 test(s).
+[==========] tests: Running 5 test(s).
 [ RUN      ] test_domain_wildcard
 [       OK ] test_domain_wildcard
 [ RUN      ] test_cidr
 [       OK ] test_cidr
-[ RUN      ] test_select
-[       OK ] test_select
-[==========] tests: 3 test(s) run.
-[  PASSED  ] 3 test(s).
+[ RUN      ] test_select_priority
+[       OK ] test_select_priority
+[ RUN      ] test_select_default
+[       OK ] test_select_default
+[ RUN      ] test_remove_rule
+[       OK ] test_remove_rule
+[==========] tests: 5 test(s) run.
+[  PASSED  ] 5 test(s).
 <end of output>
-Test time =   0.57 sec
+Test time =   0.56 sec
 ----------------------------------------------------------
 Test Passed.
-"test_router" end time: Oct 26 09:19 CST
+"test_router" end time: Oct 26 09:21 CST
 "test_router" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-4/7 Testing: test_auth
-4/7 Test: test_auth
+4/8 Testing: test_auth
+4/8 Test: test_auth
 Command: "/Users/kkito/proj/demo/rybaproxy/build-asan/tests/test_auth"
 Directory: /Users/kkito/proj/demo/rybaproxy/build-asan/tests
-"test_auth" start time: Oct 26 09:19 CST
+"test_auth" start time: Oct 26 09:21 CST
 Output:
 ----------------------------------------------------------
 [==========] tests: Running 2 test(s).
@@ -83,18 +87,18 @@ SUMMARY: UndefinedBehaviorSanitizer: undefined-behavior /Users/kkito/proj/demo/r
 [==========] tests: 2 test(s) run.
 [  PASSED  ] 2 test(s).
 <end of output>
-Test time =   0.58 sec
+Test time =   0.56 sec
 ----------------------------------------------------------
 Test Passed.
-"test_auth" end time: Oct 26 09:19 CST
+"test_auth" end time: Oct 26 09:21 CST
 "test_auth" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-5/7 Testing: test_socks5
-5/7 Test: test_socks5
+5/8 Testing: test_socks5
+5/8 Test: test_socks5
 Command: "/Users/kkito/proj/demo/rybaproxy/build-asan/tests/test_socks5"
 Directory: /Users/kkito/proj/demo/rybaproxy/build-asan/tests
-"test_socks5" start time: Oct 26 09:19 CST
+"test_socks5" start time: Oct 26 09:21 CST
 Output:
 ----------------------------------------------------------
 [==========] tests: Running 3 test(s).
@@ -107,18 +111,18 @@ Output:
 [==========] tests: 3 test(s) run.
 [  PASSED  ] 3 test(s).
 <end of output>
-Test time =   0.59 sec
+Test time =   0.56 sec
 ----------------------------------------------------------
 Test Passed.
-"test_socks5" end time: Oct 26 09:19 CST
+"test_socks5" end time: Oct 26 09:21 CST
 "test_socks5" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-6/7 Testing: test_http_proxy
-6/7 Test: test_http_proxy
+6/8 Testing: test_http_proxy
+6/8 Test: test_http_proxy
 Command: "/Users/kkito/proj/demo/rybaproxy/build-asan/tests/test_http_proxy"
 Directory: /Users/kkito/proj/demo/rybaproxy/build-asan/tests
-"test_http_proxy" start time: Oct 26 09:19 CST
+"test_http_proxy" start time: Oct 26 09:21 CST
 Output:
 ----------------------------------------------------------
 [==========] tests: Running 2 test(s).
@@ -129,18 +133,18 @@ Output:
 [==========] tests: 2 test(s) run.
 [  PASSED  ] 2 test(s).
 <end of output>
-Test time =   0.56 sec
+Test time =   0.66 sec
 ----------------------------------------------------------
 Test Passed.
-"test_http_proxy" end time: Oct 26 09:19 CST
+"test_http_proxy" end time: Oct 26 09:21 CST
 "test_http_proxy" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-7/7 Testing: test_stats
-7/7 Test: test_stats
+7/8 Testing: test_stats
+7/8 Test: test_stats
 Command: "/Users/kkito/proj/demo/rybaproxy/build-asan/tests/test_stats"
 Directory: /Users/kkito/proj/demo/rybaproxy/build-asan/tests
-"test_stats" start time: Oct 26 09:19 CST
+"test_stats" start time: Oct 26 09:21 CST
 Output:
 ----------------------------------------------------------
 [==========] tests: Running 1 test(s).
@@ -149,11 +153,31 @@ Output:
 [==========] tests: 1 test(s) run.
 [  PASSED  ] 1 test(s).
 <end of output>
-Test time =   0.63 sec
+Test time =   0.56 sec
 ----------------------------------------------------------
 Test Passed.
-"test_stats" end time: Oct 26 09:19 CST
+"test_stats" end time: Oct 26 09:21 CST
 "test_stats" time elapsed: 00:00:00
 ----------------------------------------------------------
 
-End testing: Oct 26 09:19 CST
+8/8 Testing: test_db
+8/8 Test: test_db
+Command: "/Users/kkito/proj/demo/rybaproxy/build-asan/tests/test_db"
+Directory: /Users/kkito/proj/demo/rybaproxy/build-asan/tests
+"test_db" start time: Oct 26 09:21 CST
+Output:
+----------------------------------------------------------
+[==========] tests: Running 1 test(s).
+[ RUN      ] test_db_roundtrip
+[       OK ] test_db_roundtrip
+[==========] tests: 1 test(s) run.
+[  PASSED  ] 1 test(s).
+<end of output>
+Test time =   0.63 sec
+----------------------------------------------------------
+Test Passed.
+"test_db" end time: Oct 26 09:21 CST
+"test_db" time elapsed: 00:00:00
+----------------------------------------------------------
+
+End testing: Oct 26 09:21 CST

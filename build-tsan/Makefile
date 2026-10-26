@@ -244,6 +244,19 @@ test_stats/fast:
 	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_stats.dir/build.make tests/CMakeFiles/test_stats.dir/build
 .PHONY : test_stats/fast
 
+#=============================================================================
+# Target rules for targets named test_db
+
+# Build rule for target.
+test_db: cmake_check_build_system
+	$(MAKE) $(MAKESILENT) -f CMakeFiles/Makefile2 test_db
+.PHONY : test_db
+
+# fast build rule for target.
+test_db/fast:
+	$(MAKE) $(MAKESILENT) -f tests/CMakeFiles/test_db.dir/build.make tests/CMakeFiles/test_db.dir/build
+.PHONY : test_db/fast
+
 src/admin/auth.o: src/admin/auth.c.o
 .PHONY : src/admin/auth.o
 
@@ -593,6 +606,7 @@ help:
 	@echo "... rybaproxy_core"
 	@echo "... test_auth"
 	@echo "... test_config"
+	@echo "... test_db"
 	@echo "... test_http_proxy"
 	@echo "... test_router"
 	@echo "... test_smoke"
