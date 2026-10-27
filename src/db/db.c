@@ -224,6 +224,234 @@ void db_stop(void) {
 
 
 
+/* ---------- helpers ---------- */
+static void db_json_escape(const char *src, char *dst, size_t dstsz) {
+    size_t j = 0;
+    if (!src) src = "";
+    for (size_t i = 0; src[i] && j + 2 < dstsz; i++) {
+        char c = src[i];
+        if (c == '"' || c == '\\') { dst[j++] = '\\'; dst[j++] = c; }
+        else if (c == '\n') { dst[j++] = '\\'; dst[j++] = 'n'; }
+        else if (c == '\r') { dst[j++] = '\\'; dst[j++] = 'r'; }
+        else if ((unsigned char)c < 0x20) { dst[j++] = ' '; }
+        else dst[j++] = c;
+    }
+    dst[j] = '\0';
+}
+
+int db_query_sessions(const char *client, const char *target, int upstream_id, int limit, int offset, char *buf, size_t bufsz, int *out_total) {
+    if (!buf || bufsz == 0) return -1;
+    if (limit <= 0) limit = 100;
+    if (limit > 1000) limit = 1000;
+    if (offset < 0) offset = 0;
+    if (!g_db) { snprintf(buf, bufsz, "{\"data\":[],\"total\":0,\"limit\":%d,\"offset\":%d}", limit, offset); if (out_total) *out_total = 0; return 0; }
+    char where[512]; where[0] = '\0';
+    char cpat[140] = "", tpat[520] = "";
+    if (client && client[0]) { snprintf(cpat, sizeof cpat, "%%%s%%", client); strncat(where, " AND client_ip LIKE ? ESCAPE '\\'", sizeof where - strlen(where) - 1); }
+    if (target && target[0]) { snprintf(tpat, sizeof tpat, "%%%s%%", target); strncat(where, " AND target_host LIKE ? ESCAPE '\\'", sizeof where - strlen(where) - 1); }
+    if (upstream_id >= 0) strncat(where, " AND upstream_id = ?", sizeof where - strlen(where) - 1);
+    char csql[768];
+    snprintf(csql, sizeof csql, "SELECT COUNT(*) FROM sessions WHERE 1=1%s;", where);
+    sqlite3_stmt *st = NULL;
+    int total = 0;
+    if (sqlite3_prepare_v2(g_db, csql, -1, &st, NULL) == SQLITE_OK) {
+        int bi = 1;
+        if (cpat[0]) sqlite3_bind_text(st, bi++, cpat, -1, SQLITE_TRANSIENT);
+        if (tpat[0]) sqlite3_bind_text(st, bi++, tpat, -1, SQLITE_TRANSIENT);
+        if (upstream_id >= 0) sqlite3_bind_int(st, bi++, upstream_id);
+        if (sqlite3_step(st) == SQLITE_ROW) total = sqlite3_column_int(st, 0);
+        sqlite3_finalize(st);
+    }
+    if (out_total) *out_total = total;
+    char qsql[768];
+    snprintf(qsql, sizeof qsql, "SELECT id,protocol,client_ip,target_host,target_port,status,bytes_up,bytes_down,started_at,ended_at FROM sessions WHERE 1=1%s ORDER BY started_at DESC LIMIT ? OFFSET ?;", where);
+    size_t pos = 0;
+    pos += snprintf(buf + pos, bufsz - pos, "{\"data\":[");
+    if (sqlite3_prepare_v2(g_db, qsql, -1, &st, NULL) != SQLITE_OK) {
+        snprintf(buf, bufsz, "{\"data\":[],\"total\":%d,\"limit\":%d,\"offset\":%d}", total, limit, offset);
+        return 0;
+    }
+    int bi = 1;
+    if (cpat[0]) sqlite3_bind_text(st, bi++, cpat, -1, SQLITE_TRANSIENT);
+    if (tpat[0]) sqlite3_bind_text(st, bi++, tpat, -1, SQLITE_TRANSIENT);
+    if (upstream_id >= 0) sqlite3_bind_int(st, bi++, upstream_id);
+    sqlite3_bind_int(st, bi++, limit);
+    sqlite3_bind_int(st, bi++, offset);
+    int first = 1;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        char cipe[130], thoste[520];
+        db_json_escape((const char*)sqlite3_column_text(st, 2), cipe, sizeof cipe);
+        db_json_escape((const char*)sqlite3_column_text(st, 3), thoste, sizeof thoste);
+        char item[1024];
+        snprintf(item, sizeof item,
+            "%s{\"id\":%lld,\"protocol\":\"%s\",\"client_ip\":\"%s\",\"target_host\":\"%s\",\"target_port\":%d,\"status\":%d,\"bytes_up\":%lld,\"bytes_down\":%lld,\"started_at\":%lld,\"ended_at\":%lld}",
+            first ? "" : ",",
+            (long long)sqlite3_column_int64(st, 0),
+            (const char*)sqlite3_column_text(st, 1), cipe, thoste,
+            sqlite3_column_int(st, 4), sqlite3_column_int(st, 5),
+            (long long)sqlite3_column_int64(st, 6), (long long)sqlite3_column_int64(st, 7),
+            (long long)sqlite3_column_int64(st, 8), (long long)sqlite3_column_int64(st, 9));
+        first = 0;
+        size_t ilen = strlen(item);
+        if (pos + ilen + 64 >= bufsz) break;
+        memcpy(buf + pos, item, ilen);
+        pos += ilen;
+    }
+    sqlite3_finalize(st);
+    snprintf(buf + pos, bufsz - pos, "],\"total\":%d,\"limit\":%d,\"offset\":%d}", total, limit, offset);
+    return 0;
+}
+
+int db_get_session_by_id(long long id, char *buf, size_t bufsz) {
+    if (!buf || bufsz == 0) return -1;
+    if (!g_db) return 1; /* not found */
+    const char *sql = "SELECT id,protocol,client_ip,target_host,target_port,status,bytes_up,bytes_down,started_at,ended_at FROM sessions WHERE id = ?;";
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_int64(st, 1, id);
+    int rc = 1;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        char cipe[130], thoste[520];
+        db_json_escape((const char*)sqlite3_column_text(st, 2), cipe, sizeof cipe);
+        db_json_escape((const char*)sqlite3_column_text(st, 3), thoste, sizeof thoste);
+        snprintf(buf, bufsz,
+            "{\"id\":%lld,\"protocol\":\"%s\",\"client_ip\":\"%s\",\"target_host\":\"%s\",\"target_port\":%d,\"status\":%d,\"bytes_up\":%lld,\"bytes_down\":%lld,\"started_at\":%lld,\"ended_at\":%lld}",
+            (long long)sqlite3_column_int64(st, 0),
+            (const char*)sqlite3_column_text(st, 1), cipe, thoste,
+            sqlite3_column_int(st, 4), sqlite3_column_int(st, 5),
+            (long long)sqlite3_column_int64(st, 6), (long long)sqlite3_column_int64(st, 7),
+            (long long)sqlite3_column_int64(st, 8), (long long)sqlite3_column_int64(st, 9));
+        rc = 0;
+    }
+    sqlite3_finalize(st);
+    return rc;
+}
+
+int db_stats_summary(long long from_ms, long long to_ms, char *buf, size_t bufsz) {
+    if (!buf || bufsz == 0) return -1;
+    if (!g_db) { snprintf(buf, bufsz, "{\"sessions\":0,\"bytes_up\":0,\"bytes_down\":0,\"errors\":0}"); return 0; }
+    /* started_at stored in seconds (time_t); API from/to are unix ms */
+    long long from_s = from_ms > 0 ? from_ms / 1000 : -1;
+    long long to_s = to_ms > 0 ? to_ms / 1000 : -1;
+    const char *sql = "SELECT COUNT(*),COALESCE(SUM(bytes_up),0),COALESCE(SUM(bytes_down),0),COALESCE(SUM(status!=0),0) FROM sessions WHERE (?1<0 OR started_at>=?1) AND (?2<0 OR started_at<=?2);";
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_int64(st, 1, from_s);
+    sqlite3_bind_int64(st, 2, to_s);
+    long long n = 0, up = 0, down = 0, err = 0;
+    if (sqlite3_step(st) == SQLITE_ROW) {
+        n = sqlite3_column_int64(st, 0); up = sqlite3_column_int64(st, 1);
+        down = sqlite3_column_int64(st, 2); err = sqlite3_column_int64(st, 3);
+    }
+    sqlite3_finalize(st);
+    snprintf(buf, bufsz, "{\"sessions\":%lld,\"bytes_up\":%lld,\"bytes_down\":%lld,\"errors\":%lld}", n, up, down, err);
+    return 0;
+}
+
+int db_stats_daily(int days, char *buf, size_t bufsz) {
+    if (!buf || bufsz == 0) return -1;
+    if (days <= 0) days = 30;
+    if (days > 365) days = 365;
+    if (!g_db) { snprintf(buf, bufsz, "[]"); return 0; }
+    const char *sql = "SELECT date(started_at,'unixepoch') d,COUNT(*),COALESCE(SUM(bytes_up),0),COALESCE(SUM(bytes_down),0),COALESCE(SUM(status!=0),0) FROM sessions WHERE started_at >= strftime('%s','now',?||' days') GROUP BY d ORDER BY d;";
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    char off[16]; snprintf(off, sizeof off, "-%d", days);
+    sqlite3_bind_text(st, 1, off, -1, SQLITE_TRANSIENT);
+    size_t pos = 0;
+    pos += snprintf(buf + pos, bufsz - pos, "[");
+    int first = 1;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        char item[256];
+        snprintf(item, sizeof item, "%s{\"day\":\"%s\",\"sessions\":%lld,\"bytes_up\":%lld,\"bytes_down\":%lld,\"errors\":%lld}",
+            first ? "" : ",", (const char*)sqlite3_column_text(st, 0),
+            (long long)sqlite3_column_int64(st, 1), (long long)sqlite3_column_int64(st, 2),
+            (long long)sqlite3_column_int64(st, 3), (long long)sqlite3_column_int64(st, 4));
+        first = 0;
+        if (pos + strlen(item) + 2 >= bufsz) break;
+        memcpy(buf + pos, item, strlen(item));
+        pos += strlen(item);
+    }
+    sqlite3_finalize(st);
+    snprintf(buf + pos, bufsz - pos, "]");
+    return 0;
+}
+
+int db_stats_top(const char *by, int limit, long long from_ms, long long to_ms, char *buf, size_t bufsz) {
+    if (!buf || bufsz == 0) return -1;
+    if (limit <= 0) limit = 20;
+    if (limit > 100) limit = 100;
+    int use_client = (by && strcmp(by, "client") == 0);
+    if (!by || (!use_client && strcmp(by, "target") != 0)) return -2; /* invalid */
+    if (!g_db) { snprintf(buf, bufsz, "[]"); return 0; }
+    long long from_s = from_ms > 0 ? from_ms / 1000 : -1;
+    long long to_s = to_ms > 0 ? to_ms / 1000 : -1;
+    char sql[512];
+    snprintf(sql, sizeof sql, "SELECT %s,COUNT(*),COALESCE(SUM(bytes_up),0)+COALESCE(SUM(bytes_down),0) t FROM sessions WHERE (?1<0 OR started_at>=?1) AND (?2<0 OR started_at<=?2) GROUP BY %s ORDER BY t DESC LIMIT ?3;",
+        use_client ? "client_ip" : "target_host", use_client ? "client_ip" : "target_host");
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_int64(st, 1, from_s);
+    sqlite3_bind_int64(st, 2, to_s);
+    sqlite3_bind_int(st, 3, limit);
+    size_t pos = 0;
+    pos += snprintf(buf + pos, bufsz - pos, "[");
+    int first = 1;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        char keye[520];
+        db_json_escape((const char*)sqlite3_column_text(st, 0), keye, sizeof keye);
+        char item[640];
+        snprintf(item, sizeof item, "%s{\"key\":\"%s\",\"sessions\":%lld,\"bytes\":%lld}",
+            first ? "" : ",", keye,
+            (long long)sqlite3_column_int64(st, 1), (long long)sqlite3_column_int64(st, 2));
+        first = 0;
+        if (pos + strlen(item) + 2 >= bufsz) break;
+        memcpy(buf + pos, item, strlen(item));
+        pos += strlen(item);
+    }
+    sqlite3_finalize(st);
+    snprintf(buf + pos, bufsz - pos, "]");
+    return 0;
+}
+
+int db_settings_get(char *buf, size_t bufsz) {
+    if (!buf || bufsz == 0) return -1;
+    if (!g_db) { snprintf(buf, bufsz, "{}"); return 0; }
+    const char *sql = "SELECT key,value FROM settings;";
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    size_t pos = 0;
+    pos += snprintf(buf + pos, bufsz - pos, "{");
+    int first = 1;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        char ke[260], ve[1050];
+        db_json_escape((const char*)sqlite3_column_text(st, 0), ke, sizeof ke);
+        db_json_escape((const char*)sqlite3_column_text(st, 1), ve, sizeof ve);
+        char item[1400];
+        snprintf(item, sizeof item, "%s\"%s\":\"%s\"", first ? "" : ",", ke, ve);
+        first = 0;
+        if (pos + strlen(item) + 2 >= bufsz) break;
+        memcpy(buf + pos, item, strlen(item));
+        pos += strlen(item);
+    }
+    sqlite3_finalize(st);
+    snprintf(buf + pos, bufsz - pos, "}");
+    return 0;
+}
+
+int db_settings_set(const char *key, const char *value) {
+    if (!key || !key[0] || !value) return -1;
+    if (!g_db) return -1;
+    const char *sql = "INSERT OR REPLACE INTO settings(key,value) VALUES(?1,?2);";
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_text(st, 1, key, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(st, 2, value, -1, SQLITE_TRANSIENT);
+    int rc = sqlite3_step(st);
+    sqlite3_finalize(st);
+    return (rc == SQLITE_DONE) ? 0 : -1;
+}
+
 int db_get_recent_sessions(int limit, char *buf, size_t bufsz) {
     if (!buf || bufsz == 0) return -1;
     if (limit <= 0) limit = 100;
