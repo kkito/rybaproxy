@@ -60,9 +60,7 @@ int main(int argc, char **argv) {
     geo_init();
     {
         char gdir[512];
-        const char *envd = getenv("RYBA_GEO_DIR");
-        if (envd && *envd) snprintf(gdir, sizeof gdir, "%s", envd);
-        else if (db_get_dir(gdir, sizeof gdir) != 0) snprintf(gdir, sizeof gdir, ".");
+        if (geo_active_dir(cfg.geo_dir, gdir, sizeof gdir) != 0) snprintf(gdir, sizeof gdir, ".");
         if (geo_load(gdir) == 0)
             LOG_INFO("geo db loaded: ip=%zu site=%zu", geo_ip_count(), geo_site_count());
         else

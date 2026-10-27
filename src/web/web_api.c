@@ -552,9 +552,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
     if (strncmp(uri, "/api/geo", 8) == 0) {
         if (strcmp(uri, "/api/geo/status") == 0 && strcmp(method, "GET") == 0) {
             char dir[512];
-            const char *envd = getenv("RYBA_GEO_DIR");
-            if (envd && *envd) snprintf(dir, sizeof dir, "%s", envd);
-            else if (db_get_dir(dir, sizeof dir) != 0) snprintf(dir, sizeof dir, ".");
+            if (geo_active_dir(srv->config.geo_dir, dir, sizeof dir) != 0) snprintf(dir, sizeof dir, ".");
             char p1[1024], p2[1024];
             snprintf(p1, sizeof p1, "%s/geoip.dat", dir);
             snprintf(p2, sizeof p2, "%s/geosite.dat", dir);
@@ -575,9 +573,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
         }
         if (strcmp(uri, "/api/geo/download") == 0 && strcmp(method, "POST") == 0) {
             char dir[512];
-            const char *envd = getenv("RYBA_GEO_DIR");
-            if (envd && *envd) snprintf(dir, sizeof dir, "%s", envd);
-            else if (db_get_dir(dir, sizeof dir) != 0) snprintf(dir, sizeof dir, ".");
+            if (geo_active_dir(srv->config.geo_dir, dir, sizeof dir) != 0) snprintf(dir, sizeof dir, ".");
             char err[512];
             if (geo_download(dir, err, sizeof err) != 0) {
                 char m[640];

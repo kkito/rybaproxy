@@ -1,4 +1,5 @@
 #include "rybaproxy/config.h"
+#include "rybaproxy/paths.h"
 #include "rybaproxy/upstream.h"
 
 #include <cjson/cJSON.h>
@@ -38,7 +39,8 @@ void config_init_defaults(config_t *c) {
     c->fallback_to_direct = true;
     c->resolve_for_routing = false;
     strcpy(c->default_upstream, "direct");
-    strcpy(c->db_path, "/var/lib/rybaproxy/stats.db");
+    ryba_default_db_path(getenv("HOME"), c->db_path, sizeof c->db_path);
+    c->geo_dir[0] = '\0';
     c->retention_days = 90;
 }
 
@@ -95,8 +97,11 @@ int config_load(const char *path, config_t *c) {
     const cJSON *stats = cJSON_GetObjectItemCaseSensitive(root, "stats");
     if (cJSON_IsObject(stats)) {
         copy_str(c->db_path, sizeof c->db_path, stats, "db_path");
+        copy_str(c->geo_dir, sizeof c->geo_dir, stats, "geo_dir");
         c->retention_days = get_int(stats, "retention_days", c->retention_days);
     }
+    /* 兼容：顶层 geo_dir 也接受 */
+    copy_str(c->geo_dir, sizeof c->geo_dir, root, "geo_dir");
 
     const cJSON *ups = cJSON_GetObjectItemCaseSensitive(root, "upstreams");
     if (cJSON_IsArray(ups)) {

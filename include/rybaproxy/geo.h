@@ -24,6 +24,11 @@ size_t geo_ip_count(void);
 size_t geo_site_count(void);
 /* 下载 dat 到 dir（tmp+rename 原子落盘，成功后 geo_load）；失败 err 写原因 */
 int geo_download(const char *dir, char *err, size_t errsz);
+/* 目录解析（纯函数）：cfg > env > $HOME/.local/rybaproxy > "." */
+int geo_resolve_dir(const char *cfg_dir, const char *env_dir, const char *home,
+                    char *out, size_t outsz);
+/* 生效目录（薄胶水）：读 RYBA_GEO_DIR/HOME 环境 */
+int geo_active_dir(const char *cfg_dir, char *out, size_t outsz);
 /* 测试钩子：清表+清DNS缓存+loaded=0 */
 void geo_test_reset(void);
 

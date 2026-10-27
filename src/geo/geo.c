@@ -1,4 +1,5 @@
 #include "rybaproxy/geo.h"
+#include "rybaproxy/paths.h"
 
 #include <arpa/inet.h>
 #include <ctype.h>
@@ -258,6 +259,23 @@ static const char *kGeoSiteURL = "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray
 static const char *geo_env_or(const char *name, const char *fallback) {
     const char *v = getenv(name);
     return (v && *v) ? v : fallback;
+}
+
+/* 目录解析：纯函数，优先级 cfg > env(RYBA_GEO_DIR) > $HOME/.local/rybaproxy > "." */
+int geo_resolve_dir(const char *cfg_dir, const char *env_dir, const char *home,
+                    char *out, size_t outsz) {
+    if (!out || outsz == 0) return -1;
+    if (cfg_dir && *cfg_dir) { snprintf(out, outsz, "%s", cfg_dir); return 0; }
+    if (env_dir && *env_dir) { snprintf(out, outsz, "%s", env_dir); return 0; }
+    char dflt[512];
+    ryba_data_dir(home, dflt, sizeof dflt);
+    snprintf(out, outsz, "%s", dflt);
+    return 0;
+}
+
+/* 生效目录：薄胶水，只读环境 + 委托纯函数 */
+int geo_active_dir(const char *cfg_dir, char *out, size_t outsz) {
+    return geo_resolve_dir(cfg_dir, getenv("RYBA_GEO_DIR"), getenv("HOME"), out, outsz);
 }
 
 /* 目录不存在则递归创建（dat 落盘用），失败返回 -1 */

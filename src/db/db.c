@@ -1,4 +1,5 @@
 #include "rybaproxy/db.h"
+#include "rybaproxy/paths.h"
 #include "rybaproxy/router.h"
 #include "rybaproxy/stats.h"
 #include "rybaproxy/upstream.h"
@@ -86,8 +87,12 @@ int db_get_dir(char *out, size_t outsz) {
 }
 
 int db_init(const char *path) {
-    if (!path || !path[0]) path = "/var/lib/rybaproxy/stats.db";
-    snprintf(g_db_path, sizeof g_db_path, "%s", path);
+    if (!path || !path[0]) {
+        ryba_default_db_path(getenv("HOME"), g_db_path, sizeof g_db_path);
+        path = g_db_path;
+    } else {
+        snprintf(g_db_path, sizeof g_db_path, "%s", path);
+    }
     /* ensure parent dir */
     char dir[512];
     snprintf(dir, sizeof dir, "%s", path);

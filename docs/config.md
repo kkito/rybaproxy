@@ -50,7 +50,7 @@
   },
 
   "stats": {
-    "db_path": "/var/lib/rybaproxy/stats.db",
+    "db_path": "~/.local/rybaproxy/stats.db",
     "retention_days": 90,
     "aggregate_retention_days": 365,
     "queue_size": 65536,

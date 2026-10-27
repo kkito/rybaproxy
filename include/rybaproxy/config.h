@@ -21,7 +21,8 @@ typedef struct {
     char default_upstream[RYBA_NAME_MAX];
     bool fallback_to_direct;
     bool resolve_for_routing;
-    char db_path[256];
+    char db_path[512];
+    char geo_dir[512];
     int retention_days;
     upstream_profile_t *upstreams;
     int upstream_count;

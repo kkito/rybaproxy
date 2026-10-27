@@ -110,6 +110,33 @@ static void test_load_missing_dir(void **s) {
     assert_int_equal(geo_load("/tmp/ryba_geo_no_such_dir_xyz"), -1);
 }
 
+static void test_resolve_dir_prefers_cfg(void **s) {
+    (void)s;
+    /* cfg 优先级最高，db_dir 仅在前两者为空时作为回退 */
+    char out[256];
+    assert_int_equal(geo_resolve_dir("/cfg/dir", "/env/dir", "/home/u", out, sizeof out), 0);
+    assert_string_equal(out, "/cfg/dir");
+    assert_int_equal(geo_resolve_dir("", "/env/dir", "/home/u", out, sizeof out), 0);
+    assert_string_equal(out, "/env/dir");
+}
+
+static void test_resolve_dir_env_then_home_default(void **s) {
+    (void)s;
+    char out[256];
+    assert_int_equal(geo_resolve_dir(NULL, "/env/dir", "/home/u", out, sizeof out), 0);
+    assert_string_equal(out, "/env/dir");
+    assert_int_equal(geo_resolve_dir("", "", "/home/u", out, sizeof out), 0);
+    assert_string_equal(out, "/home/u/.local/rybaproxy");
+}
+
+static void test_resolve_dir_no_home_falls_back_dot(void **s) {
+    (void)s;
+    char out[256];
+    assert_int_equal(geo_resolve_dir(NULL, NULL, NULL, out, sizeof out), 0);
+    assert_string_equal(out, ".");
+    assert_int_equal(geo_resolve_dir(NULL, NULL, NULL, NULL, 0), -1);
+}
+
 static void test_reload_replaces_without_dup(void **s) {
     (void)s;
     /* 同一目录连 load 两次：第二次先清空再装，计数不变 */
@@ -130,6 +157,9 @@ int main(void) {
         cmocka_unit_test_setup_teardown(test_db_unloaded, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_wire_dat, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_missing_dir, setup, teardown),
+        cmocka_unit_test(test_resolve_dir_prefers_cfg),
+        cmocka_unit_test(test_resolve_dir_env_then_home_default),
+        cmocka_unit_test(test_resolve_dir_no_home_falls_back_dot),
         cmocka_unit_test_setup_teardown(test_reload_replaces_without_dup, setup, teardown),
     };
     return cmocka_run_group_tests(t, NULL, NULL);
