@@ -262,7 +262,8 @@ static void send_json(struct mg_connection *conn, int status, const char *body) 
 }
 
 int valid_geo(const char *s) {
-    return !s || !*s || strcmp(s, "cn") == 0 || strcmp(s, "!cn") == 0;
+    return !s || !*s || strcmp(s, "cn") == 0 || strcmp(s, "!cn") == 0
+        || strcmp(s, "lan") == 0 || strcmp(s, "!lan") == 0;
 }
 
 static void send_envelope(struct mg_connection *conn, int status, char *env) {
@@ -441,7 +442,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             if ((v = cJSON_GetObjectItem(j, "domain_pattern")) && cJSON_IsString(v)) snprintf(r.domain_pattern, sizeof r.domain_pattern, "%s", v->valuestring);
             if ((v = cJSON_GetObjectItem(j, "ip_cidr")) && cJSON_IsString(v)) snprintf(r.ip_cidr, sizeof r.ip_cidr, "%s", v->valuestring);
             if ((v = cJSON_GetObjectItem(j, "geo_ip")) && cJSON_IsString(v)) {
-                if (!valid_geo(v->valuestring)) { cJSON_Delete(j); send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "geo_ip must be cn or !cn")); return; }
+                if (!valid_geo(v->valuestring)) { cJSON_Delete(j); send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "geo_ip must be cn, !cn, lan or !lan")); return; }
                 snprintf(r.geo_ip, sizeof r.geo_ip, "%s", v->valuestring);
             }
             if ((v = cJSON_GetObjectItem(j, "geo_site")) && cJSON_IsString(v)) {
@@ -495,7 +496,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
                     if ((v = cJSON_GetObjectItem(j, "domain_pattern")) && cJSON_IsString(v)) snprintf(r->domain_pattern, sizeof r->domain_pattern, "%s", v->valuestring);
                     if ((v = cJSON_GetObjectItem(j, "ip_cidr")) && cJSON_IsString(v)) snprintf(r->ip_cidr, sizeof r->ip_cidr, "%s", v->valuestring);
                     if ((v = cJSON_GetObjectItem(j, "geo_ip")) && cJSON_IsString(v)) {
-                        if (!valid_geo(v->valuestring)) { pthread_mutex_unlock(&srv->lock); cJSON_Delete(j); send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "geo_ip must be cn or !cn")); return; }
+                        if (!valid_geo(v->valuestring)) { pthread_mutex_unlock(&srv->lock); cJSON_Delete(j); send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "geo_ip must be cn, !cn, lan or !lan")); return; }
                         snprintf(r->geo_ip, sizeof r->geo_ip, "%s", v->valuestring);
                     }
                     if ((v = cJSON_GetObjectItem(j, "geo_site")) && cJSON_IsString(v)) {

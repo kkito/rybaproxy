@@ -174,6 +174,55 @@ static void test_rule_geo_site_cn(void **s) {
     geo_set_resolver(NULL);
     router_free(&r);
 }
+/* geo_ip="lan"/"!lan"：内网地址可指定走任意上游。
+ * 内网判定不查库不解析，IP 字面量必须零网络（哨兵 mock 锁住）。 */
+static void test_rule_geo_lan(void **s) {
+    (void)s;
+    geo_set_resolver(must_not_resolve_netcheck);
+    router_t r; router_init(&r, "direct", 1);
+    rule_t rule = {0}; rule.id=1; rule.priority=100; rule.enabled=1;
+    strcpy(rule.geo_ip, "lan"); rule.upstream_id=3;
+    router_add_rule(&r, &rule);
+    assert_int_equal(router_select(&r, "192.168.1.5", 80, PROTO_HTTP, NULL), 3);
+    assert_int_equal(router_select(&r, "10.0.0.9", 80, PROTO_HTTP, NULL), 3);
+    assert_int_equal(router_select(&r, "172.27.130.170", 80, PROTO_HTTP, NULL), 3);
+    assert_int_equal(router_select(&r, "8.8.8.8", 80, PROTO_HTTP, NULL), -1);
+    geo_set_resolver(NULL);
+    router_free(&r);
+}
+
+static void test_rule_geo_not_lan(void **s) {
+    (void)s;
+    router_t r; router_init(&r, "direct", 1);
+    rule_t rule = {0}; rule.id=1; rule.priority=100; rule.enabled=1;
+    strcpy(rule.geo_ip, "!lan"); rule.upstream_id=4;
+    router_add_rule(&r, &rule);
+    assert_int_equal(router_select(&r, "8.8.8.8", 80, PROTO_HTTP, NULL), 4);
+    assert_int_equal(router_select(&r, "192.168.1.5", 80, PROTO_HTTP, NULL), -1);
+    /* 域名解析到公网 IP → !lan 命中，全程 mock */
+    extern int ryba_test_fake_dns_noncn(const char *host, char *ip_out, size_t ipsz);
+    geo_set_resolver(ryba_test_fake_dns_noncn);
+    assert_int_equal(router_select(&r, "any.example", 80, PROTO_HTTP, NULL), 4);
+    geo_set_resolver(NULL);
+    router_free(&r);
+}
+
+/* 内网规则优先级高于 cn 规则：内网才能被指定去代理而不是 direct */
+static void test_rule_geo_lan_beats_cn(void **s) {
+    (void)s;
+    router_t r; router_init(&r, "direct", 1);
+    rule_t cn = {0}; cn.id=1; cn.priority=200; cn.enabled=1;
+    strcpy(cn.geo_ip, "cn"); cn.upstream_id=1;      /* direct */
+    router_add_rule(&r, &cn);
+    rule_t lan = {0}; lan.id=2; lan.priority=900; lan.enabled=1;
+    strcpy(lan.geo_ip, "lan"); lan.upstream_id=0;   /* proxy */
+    router_add_rule(&r, &lan);
+    assert_int_equal(router_select(&r, "192.168.1.5", 80, PROTO_HTTP, NULL), 0);
+    /* 1.2.3.9 在测试库里是 CN 且是公网：只有 cn 规则命中 */
+    assert_int_equal(router_select(&r, "1.2.3.9", 80, PROTO_HTTP, NULL), 1);
+    router_free(&r);
+}
+
 static void test_rule_geo_empty_db_no_match(void **s) {
     (void)s;
     /* 空库红线：未知(-1)不许匹配任何 geo 条件，一律走默认(-1)，不许按!cn分流 */
@@ -238,6 +287,9 @@ int main(void) {
         cmocka_unit_test_setup_teardown(test_rule_geo_ip_cn, geo_setup, geo_teardown),
         cmocka_unit_test_setup_teardown(test_rule_geo_ip_neg, geo_setup, geo_teardown),
         cmocka_unit_test_setup_teardown(test_rule_geo_site_cn, geo_setup, geo_teardown),
+        cmocka_unit_test_setup_teardown(test_rule_geo_lan, geo_setup, geo_teardown),
+        cmocka_unit_test_setup_teardown(test_rule_geo_not_lan, geo_setup, geo_teardown),
+        cmocka_unit_test_setup_teardown(test_rule_geo_lan_beats_cn, geo_setup, geo_teardown),
         cmocka_unit_test(test_rule_geo_empty_db_no_match),
         cmocka_unit_test_setup_teardown(test_rule_geo_and_domain, geo_setup, geo_teardown),
     };

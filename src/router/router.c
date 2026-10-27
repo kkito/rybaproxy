@@ -45,13 +45,25 @@ int router_remove_rule(router_t *r, int id) {
 }
 
 /* geo 条件匹配（纯函数）：无条件恒成立，否则只在已知命中/未命中时判定。
- * 关键：cond 为空时必须短路，调用方不得发起 DNS/查表（零网络要求）。 */
-static int geo_cond_matches(const char *cond, int cn) {
+ * 关键：cond 为空时必须短路，调用方不得发起 DNS/查表（零网络要求）。
+ * 支持 cn/!cn（国别）与 lan/!lan（内网/私网）。 */
+static int geo_cond_matches(const char *cond, int v) {
     if (!cond || !cond[0]) return 1; /* 无条件恒成立 */
-    if (cn < 0) return 0;
-    if (strcmp(cond, "cn") == 0) return cn == 1;
-    if (strcmp(cond, "!cn") == 0) return cn != 1;
+    if (v < 0) return 0;
+    if (strcmp(cond, "cn") == 0) return v == 1;
+    if (strcmp(cond, "!cn") == 0) return v != 1;
+    if (strcmp(cond, "lan") == 0) return v == 1;
+    if (strcmp(cond, "!lan") == 0) return v != 1;
     return 0; /* 非法值：不匹配 */
+}
+
+/* 条件取值（纯分发）：lan 族走内网判定，其余走国别判定。
+ * 空条件返回 1 让调用方短路——这里绝不去解析/查表。 */
+static int geo_cond_value(const char *cond, const char *host) {
+    if (!cond || !cond[0]) return 1;
+    if (strcmp(cond, "lan") == 0 || strcmp(cond, "!lan") == 0)
+        return geo_host_is_lan(host);
+    return geo_host_is_cn(host);
 }
 
 static int rule_matches(const rule_t *rule, const char *host, int port, protocol_t proto, const char *client_ip) {
@@ -66,7 +78,7 @@ static int rule_matches(const rule_t *rule, const char *host, int port, protocol
         /* if domain rule also has cidr, require both; ip-only rules should leave domain empty */
     }
     /* 条件为空直接跳过查询：geo_host_is_cn 含 DNS，空条件调用即浪费一次解析 */
-    if (rule->geo_ip[0] && !geo_cond_matches(rule->geo_ip, geo_host_is_cn(host))) return 0;
+    if (rule->geo_ip[0] && !geo_cond_matches(rule->geo_ip, geo_cond_value(rule->geo_ip, host))) return 0;
     if (rule->geo_site[0] && !geo_cond_matches(rule->geo_site, geo_site_is_cn(host))) return 0;
     return 1;
 }

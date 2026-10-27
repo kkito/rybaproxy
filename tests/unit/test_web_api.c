@@ -195,6 +195,8 @@ static void test_rule_geo_validation(void **state) {
     assert_int_equal(valid_geo(""), 1);
     assert_int_equal(valid_geo("cn"), 1);
     assert_int_equal(valid_geo("!cn"), 1);
+    assert_int_equal(valid_geo("lan"), 1);
+    assert_int_equal(valid_geo("!lan"), 1);
     assert_int_equal(valid_geo("us"), 0);
     assert_int_equal(valid_geo("CN"), 0);
 }

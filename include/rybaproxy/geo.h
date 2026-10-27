@@ -11,9 +11,12 @@ void geo_free(void);
 int geo_db_loaded(void);
 /* 返回 1=CN(含私网) 0=非CN(未知按非CN) -1=输入无效 */
 int geo_ip_is_cn(const char *ip);
+/* 内网/私网判定：1=内网, 0=公网, -1=非法（不查库不解析） */
+int geo_ip_is_lan(const char *ip);
 int geo_site_is_cn(const char *host);
 /* 域名→DNS解析→查段：1=CN 0=非CN -1=未知/DNS失败；5分钟缓存 */
 int geo_host_is_cn(const char *host);
+int geo_host_is_lan(const char *host);
 /* DNS 解析器注入（测试用 mock；NULL=用系统 getaddrinfo）。返回 0 成功并写 ip_out */
 typedef int (*geo_resolver_fn)(const char *host, char *ip_out, size_t ipsz);
 void geo_set_resolver(geo_resolver_fn fn);

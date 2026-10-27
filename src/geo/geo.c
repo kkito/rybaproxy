@@ -505,6 +505,7 @@ static void lru_clear(void);
 static void dns_cache_clear(void) { lru_clear(); }
 /* 可注入 DNS 解析器（定义在后部 DNS 节；free/reset 需先用） */
 static geo_resolver_fn g_resolver;
+static int sys_resolve(const char *host, char *ip_out, size_t ipsz);
 
 int geo_init(void) { return 0; }
 
@@ -620,20 +621,34 @@ out:
 }
 
 /* 私网视同 CN */
+/* 私网/保留段判定（纯函数）：这些地址不依赖 geo 库，一律视为「内网」。
+ * 覆盖 RFC1918 + loopback + link-local + CGNAT(100.64/10) + 组播/保留/文档段，
+ * 漏一段就会把内网流量误判成非 CN 塞进代理。 */
 static int is_private_ip(const unsigned char key[16], int is6) {
     if (!is6) {
         unsigned int h;
         memcpy(&h, key, 4); h = ntohl(h);
-        if ((h >> 24) == 10) return 1;
-        if ((h & 0xFFF00000u) == 0xAC100000u) return 1;
-        if ((h & 0xFFFF0000u) == 0xC0A80000u) return 1;
-        if ((h >> 24) == 127) return 1;
+        if ((h >> 24) == 10) return 1;                          /* 10/8 */
+        if ((h & 0xFFF00000u) == 0xAC100000u) return 1;         /* 172.16/12 */
+        if ((h & 0xFFFF0000u) == 0xC0A80000u) return 1;         /* 192.168/16 */
+        if ((h >> 24) == 127) return 1;                         /* loopback */
+        if ((h & 0xFFC00000u) == 0x64400000u) return 1;         /* 100.64/10 CGNAT */
+        if ((h & 0xFFFF0000u) == 0xA9FE0000u) return 1;         /* 169.254/16 link-local */
+        if ((h & 0xF0000000u) == 0xE0000000u) return 1;         /* 224/4 组播 */
+        if ((h & 0xF0000000u) == 0xF0000000u) return 1;         /* 240/4 保留 */
+        if ((h & 0xFFFFFF00u) == 0xC0000200u) return 1;         /* 192.0.2/24 文档 */
+        if ((h & 0xFFFFF800u) == 0xC6336400u) return 1;         /* 198.51.100/24 文档 */
+        if ((h & 0xFFFFF800u) == 0xCB007100u) return 1;         /* 203.0.113/24 文档 */
+        if ((h >> 24) == 0) return 1;                           /* 0/8 本网 */
         return 0;
     }
     static const unsigned char loop[16] = {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1};
-    if (memcmp(key, loop, 16) == 0) return 1;
-    if (key[0] == 0xFC || key[0] == 0xFD) return 1;
-    if (key[0] == 0xFE && (key[1] & 0xC0) == 0x80) return 1;
+    if (memcmp(key, loop, 16) == 0) return 1;                   /* ::1 */
+    if ((key[0] & 0xFE) == 0xFC) return 1;                      /* fc00::/7 ULA */
+    if (key[0] == 0xFE && (key[1] & 0xC0) == 0x80) return 1;    /* fe80::/10 link-local */
+    if (key[0] == 0xFF) return 1;                               /* ff00::/8 组播 */
+    if (key[0] == 0x20 && key[1] == 0x01 && key[2] == 0x0d && key[3] == 0xb8) return 1; /* 2001:db8::/32 */
+    if (key[0] == 0x00) return 1;                               /* ::/8 未指定/保留 */
     return 0;
 }
 
@@ -687,6 +702,48 @@ int geo_ip_is_cn(const char *ip) {
         return hit ? 1 : 0;
     }
     return -1;
+}
+
+/* 内网判定（纯函数）：私网/保留段 = 1，公网 = 0，非法 = -1。
+ * 不查库不解析——「是不是内网」只看地址本身。 */
+int geo_ip_is_lan(const char *ip) {
+    if (!ip || !*ip) return -1;
+    unsigned char raw[16]; int is6 = 0;
+    struct in_addr a4; struct in6_addr a6;
+    if (inet_pton(AF_INET, ip, &a4) == 1) { memcpy(raw, &a4.s_addr, 4); is6 = 0; }
+    else if (inet_pton(AF_INET6, ip, &a6) == 1) { memcpy(raw, &a6, 16); is6 = 1; }
+    else return -1;
+    return is_private_ip(raw, is6) ? 1 : 0;
+}
+
+/* 内网判定（域名）：IP 字面量直接判；否则解析后判。空库也允许解析——
+ * 内网判定本来就不依赖 geo 库，与 geo_host_is_cn 的空库短路不同。 */
+int geo_host_is_lan(const char *host) {
+    if (!host || !*host) return -1;
+    struct in_addr a4; struct in6_addr a6;
+    if (inet_pton(AF_INET, host, &a4) == 1 || inet_pton(AF_INET6, host, &a6) == 1)
+        return geo_ip_is_lan(host);
+    char low[256];
+    if (geo_norm_host(host, low, sizeof low) != 0) return -1;
+    char key[GEO_LRU_KEY_MAX];
+    snprintf(key, sizeof key, "lan:%s", low);
+    pthread_mutex_lock(&g_lock);
+    time_t now = time(NULL);
+    int cached = lru_get(key, now);
+    geo_resolver_fn resolver = g_resolver;
+    pthread_mutex_unlock(&g_lock);
+    if (cached >= 0) return cached;
+    char ipstr[64] = "";
+    int lan = -1;
+    if ((resolver ? resolver(host, ipstr, sizeof ipstr)
+                  : sys_resolve(host, ipstr, sizeof ipstr)) == 0 && ipstr[0])
+        lan = geo_ip_is_lan(ipstr);
+    if (lan >= 0) {
+        pthread_mutex_lock(&g_lock);
+        lru_put(key, lan, now);
+        pthread_mutex_unlock(&g_lock);
+    }
+    return lan;
 }
 
 int geo_site_is_cn(const char *host) {

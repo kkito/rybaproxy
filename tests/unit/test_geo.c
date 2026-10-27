@@ -76,6 +76,24 @@ static void test_private_is_cn(void **s) {
     assert_int_equal(geo_ip_is_cn("::1"), 1);
 }
 
+/* lan 判定：私网/保留段为 1，公网为 0，非法输入 -1。
+ * 关键：不查库、不解析，纯地址判定。 */
+static void test_lan_predicate(void **s) {
+    (void)s;
+    assert_int_equal(geo_ip_is_lan("192.168.1.1"), 1);
+    assert_int_equal(geo_ip_is_lan("10.0.0.5"), 1);
+    assert_int_equal(geo_ip_is_lan("172.27.130.170"), 1);
+    assert_int_equal(geo_ip_is_lan("127.0.0.1"), 1);
+    assert_int_equal(geo_ip_is_lan("169.254.1.1"), 1);   /* link-local */
+    assert_int_equal(geo_ip_is_lan("100.64.0.1"), 1);    /* CGNAT */
+    assert_int_equal(geo_ip_is_lan("::1"), 1);
+    assert_int_equal(geo_ip_is_lan("fe80::1"), 1);
+    assert_int_equal(geo_ip_is_lan("223.5.5.5"), 0);     /* 公网 */
+    assert_int_equal(geo_ip_is_lan("8.8.8.8"), 0);
+    assert_int_equal(geo_ip_is_lan(NULL), -1);
+    assert_int_equal(geo_ip_is_lan("not-an-ip"), -1);
+}
+
 static void test_invalid_input(void **s) {
     (void)s;
     assert_int_equal(geo_ip_is_cn(NULL), -1);
@@ -98,6 +116,25 @@ static int must_not_resolve(const char *host, char *ip_out, size_t ipsz) {
     (void)host; (void)ip_out; (void)ipsz;
     fail_msg("resolver must not be called (no network in tests)");
     return -1;
+}
+
+/* 内网域名：走注入的 resolver 解析后判定，不碰真实 DNS */
+static void test_host_lan_uses_injected_resolver(void **s) {
+    (void)s;
+    geo_set_resolver(fake_resolver);
+    g_resolve_calls = 0;
+    /* 1.2.3.9 是公网 → 非 lan */
+    assert_int_equal(geo_host_is_lan("lan-test.example"), 0);
+    assert_int_equal(g_resolve_calls, 1);
+    geo_set_resolver(NULL);
+}
+
+static void test_host_lan_ip_literal_no_dns(void **s) {
+    (void)s;
+    geo_set_resolver(must_not_resolve);
+    assert_int_equal(geo_host_is_lan("192.168.1.5"), 1);
+    assert_int_equal(geo_host_is_lan("8.8.8.8"), 0);
+    geo_set_resolver(NULL);
 }
 
 /* RED(Task4): LRU 命中后不再碰 sqlite → 删库文件仍命中；host 归一化同条 */
@@ -253,6 +290,9 @@ int main(void) {
         cmocka_unit_test_setup_teardown(test_host_no_dns_when_db_unloaded, setup, teardown),
         cmocka_unit_test_setup_teardown(test_host_uses_injected_resolver, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_missing_dir, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_lan_predicate, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_host_lan_uses_injected_resolver, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_host_lan_ip_literal_no_dns, setup, teardown),
         cmocka_unit_test(test_resolve_dir_prefers_cfg),
         cmocka_unit_test(test_resolve_dir_env_then_home_default),
         cmocka_unit_test(test_resolve_dir_no_home_falls_back_dot),
