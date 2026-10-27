@@ -59,7 +59,13 @@ static const char *SCHEMA_TAIL =
 " error_code INTEGER, error_msg TEXT, bytes_up INTEGER NOT NULL, bytes_down INTEGER NOT NULL,"
 " started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, duration_ms INTEGER NOT NULL, nginx_forwarded INTEGER NOT NULL DEFAULT 0);"
 "CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(started_at);"
-"CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);";
+"CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+"CREATE TABLE IF NOT EXISTS geo_ip(start INTEGER NOT NULL, end INTEGER NOT NULL, cc TEXT NOT NULL);"
+"CREATE INDEX IF NOT EXISTS idx_geo_ip ON geo_ip(start, end);"
+"CREATE TABLE IF NOT EXISTS geo_ip6(s_hi INTEGER NOT NULL, s_lo INTEGER NOT NULL, e_hi INTEGER NOT NULL, e_lo INTEGER NOT NULL, cc TEXT NOT NULL);"
+"CREATE INDEX IF NOT EXISTS idx_geo_ip6 ON geo_ip6(s_hi, s_lo, e_hi, e_lo);"
+"CREATE TABLE IF NOT EXISTS geo_site_exact(host TEXT PRIMARY KEY, cc TEXT NOT NULL);"
+"CREATE TABLE IF NOT EXISTS geo_site_suffix(rev TEXT PRIMARY KEY, cc TEXT NOT NULL);";
 
 static void mkdirp(const char *path) {
     char tmp[512];
@@ -75,6 +81,8 @@ static void mkdirp(const char *path) {
 }
 
 static char g_db_path[512] = "";
+
+sqlite3 *db_handle(void) { return g_db; }
 
 int db_get_dir(char *out, size_t outsz) {
     if (!out || !outsz) return -1;

@@ -1,5 +1,6 @@
 #include <cmocka.h>
 #include <event2/event.h>
+#include <sqlite3.h>
 #include "rybaproxy/db.h"
 #include "rybaproxy/router.h"
 #include "rybaproxy/session.h"
@@ -215,6 +216,27 @@ static void test_db_nested_path_autocreate(void **state) {
     (void)system(cmd);
 }
 
+/* RED(Task2): geo 四表存在 + db_handle 出借非 NULL */
+static void test_db_has_geo_tables(void **state) {
+    (void)state;
+    char path[128];
+    snprintf(path, sizeof path, "/tmp/ryba_db_geo_%d.db", (int)getpid());
+    rm_db(path);
+    assert_int_equal(db_init(path), 0);
+    sqlite3 *h = db_handle();
+    assert_non_null(h);
+    const char *tabs[] = {"geo_ip", "geo_ip6", "geo_site_exact", "geo_site_suffix"};
+    for (int i = 0; i < 4; i++) {
+        char sql[128];
+        snprintf(sql, sizeof sql, "SELECT COUNT(*) FROM %s", tabs[i]);
+        sqlite3_stmt *st = NULL;
+        assert_int_equal(sqlite3_prepare_v2(h, sql, -1, &st, NULL), SQLITE_OK);
+        sqlite3_finalize(st);
+    }
+    db_stop();
+    rm_db(path);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_db_roundtrip),
@@ -224,6 +246,7 @@ int main(void) {
         cmocka_unit_test(test_db_settings),
         cmocka_unit_test(test_db_empty_daily),
         cmocka_unit_test(test_db_rules_geo_roundtrip),
+        cmocka_unit_test(test_db_has_geo_tables),
         cmocka_unit_test(test_db_nested_path_autocreate),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);

@@ -3,6 +3,10 @@
 
 #include "rybaproxy/session.h"
 
+typedef struct sqlite3 sqlite3;
+/* 出借 db 连接（geo 复用同一连接查表）；db_init 成功前返回 NULL */
+struct sqlite3 *db_handle(void);
+
 int db_init(const char *path);
 void db_set_retention(int days);
 void db_start(void);
