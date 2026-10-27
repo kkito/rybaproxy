@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+static const char *upstream_type_str(int t);
+static int upstream_type_from_str(const char *s);
 
 static const char INDEX_HTML[] =
 "<!DOCTYPE html>\n"
@@ -521,7 +523,7 @@ static void handle_upstreams(struct mg_connection *conn, server_ctx_t *srv) {
         cJSON *o = cJSON_CreateObject();
         cJSON_AddNumberToObject(o, "id", u->id);
         cJSON_AddStringToObject(o, "name", u->name);
-        cJSON_AddNumberToObject(o, "type", (double)u->type);
+        cJSON_AddStringToObject(o, "type", upstream_type_str(u->type));
         cJSON_AddStringToObject(o, "host", u->host);
         cJSON_AddNumberToObject(o, "port", u->port);
         cJSON_AddBoolToObject(o, "enabled", u->enabled);
@@ -627,6 +629,101 @@ static void handle_sessions(struct mg_connection *conn, server_ctx_t *srv) {
     send_json(conn, 200, buf);
 }
 
+
+static const char *upstream_type_str(int t) {
+    if (t == UPSTREAM_HTTP) return "http";
+    if (t == UPSTREAM_SOCKS5) return "socks5";
+    return "direct";
+}
+static int upstream_type_from_str(const char *s) {
+    if (!s) return UPSTREAM_DIRECT;
+    if (strcmp(s, "http") == 0) return UPSTREAM_HTTP;
+    if (strcmp(s, "socks5") == 0 || strcmp(s, "socks") == 0) return UPSTREAM_SOCKS5;
+    return UPSTREAM_DIRECT;
+}
+
+static void handle_upstreams_add(struct mg_connection *conn, server_ctx_t *srv) {
+    char buf[4096];
+    int n = mg_read(conn, buf, sizeof buf - 1);
+    if (n < 0) n = 0;
+    buf[n] = '\0';
+    cJSON *j = cJSON_Parse(buf);
+    if (!j) { send_json(conn, 400, "{\"error\":\"bad json\"}"); return; }
+    pthread_mutex_lock(&srv->lock);
+    srv->upstreams = realloc(srv->upstreams, (srv->upstream_count + 1) * sizeof(upstream_profile_t));
+    upstream_profile_t *u = &srv->upstreams[srv->upstream_count];
+    memset(u, 0, sizeof *u);
+    u->id = srv->upstream_count + 1;
+    cJSON *v;
+    if ((v = cJSON_GetObjectItem(j, "name")) && cJSON_IsString(v)) snprintf(u->name, sizeof u->name, "%s", v->valuestring);
+    if ((v = cJSON_GetObjectItem(j, "type")) && cJSON_IsString(v)) u->type = upstream_type_from_str(v->valuestring);
+    if ((v = cJSON_GetObjectItem(j, "host")) && cJSON_IsString(v)) snprintf(u->host, sizeof u->host, "%s", v->valuestring);
+    if ((v = cJSON_GetObjectItem(j, "port"))) u->port = v->valueint;
+    u->enabled = 1;
+    if ((v = cJSON_GetObjectItem(j, "enabled"))) u->enabled = cJSON_IsTrue(v);
+    srv->upstream_count++;
+    int newid = u->id;
+    pthread_mutex_unlock(&srv->lock);
+    cJSON_Delete(j);
+    char out[64];
+    snprintf(out, sizeof out, "{\"id\":%d}", newid);
+    send_json(conn, 201, out);
+}
+
+static void handle_upstreams_delete(struct mg_connection *conn, server_ctx_t *srv) {
+    const struct mg_request_info *ri = mg_get_request_info(conn);
+    const char *qs = ri->query_string ? ri->query_string : "";
+    char val[32]; val[0]='\0';
+    mg_get_var(qs, strlen(qs), "id", val, sizeof val);
+    int id = atoi(val);
+    pthread_mutex_lock(&srv->lock);
+    int idx = -1;
+    for (int i = 0; i < srv->upstream_count; i++) if (srv->upstreams[i].id == id) { idx = i; break; }
+    if (idx < 0) { pthread_mutex_unlock(&srv->lock); send_json(conn, 404, "{\"error\":\"not found\"}"); return; }
+    for (int i = idx; i < srv->upstream_count - 1; i++) srv->upstreams[i] = srv->upstreams[i+1];
+    srv->upstream_count--;
+    pthread_mutex_unlock(&srv->lock);
+    send_json(conn, 200, "{\"ok\":true}");
+}
+
+static void handle_rules_update(struct mg_connection *conn, server_ctx_t *srv) {
+    const struct mg_request_info *ri = mg_get_request_info(conn);
+    const char *qs = ri->query_string ? ri->query_string : "";
+    char val[32]; val[0]='\0';
+    mg_get_var(qs, strlen(qs), "id", val, sizeof val);
+    int id = atoi(val);
+    char buf[4096];
+    int n = mg_read(conn, buf, sizeof buf - 1);
+    if (n < 0) n = 0;
+    buf[n] = '\0';
+    cJSON *j = cJSON_Parse(buf);
+    if (!j) { send_json(conn, 400, "{\"error\":\"bad json\"}"); return; }
+    pthread_mutex_lock(&srv->lock);
+    int found = 0;
+    for (int i = 0; i < srv->router.count; i++) {
+        if (srv->router.rules[i].id == id) {
+            rule_t *r = &srv->router.rules[i];
+            cJSON *v;
+            if ((v = cJSON_GetObjectItem(j, "domain_pattern")) && cJSON_IsString(v)) snprintf(r->domain_pattern, sizeof r->domain_pattern, "%s", v->valuestring);
+            if ((v = cJSON_GetObjectItem(j, "ip_cidr")) && cJSON_IsString(v)) snprintf(r->ip_cidr, sizeof r->ip_cidr, "%s", v->valuestring);
+            if ((v = cJSON_GetObjectItem(j, "port"))) r->port = v->valueint;
+            if ((v = cJSON_GetObjectItem(j, "priority"))) r->priority = v->valueint;
+            if ((v = cJSON_GetObjectItem(j, "upstream_id"))) r->upstream_id = v->valueint;
+            if ((v = cJSON_GetObjectItem(j, "protocol")) && cJSON_IsString(v)) {
+                if (strcmp(v->valuestring, "http") == 0) r->protocol = PROTO_HTTP;
+                else if (strcmp(v->valuestring, "socks5") == 0) r->protocol = PROTO_SOCKS5;
+                else r->protocol = 0;
+            }
+            found = 1;
+            break;
+        }
+    }
+    pthread_mutex_unlock(&srv->lock);
+    cJSON_Delete(j);
+    if (!found) send_json(conn, 404, "{\"error\":\"not found\"}");
+    else send_json(conn, 200, "{\"ok\":true}");
+}
+
 static int begin_request(struct mg_connection *conn) {
     const struct mg_request_info *ri = mg_get_request_info(conn);
     server_ctx_t *srv = (server_ctx_t *)mg_get_user_context_data(conn);
@@ -636,10 +733,13 @@ static int begin_request(struct mg_connection *conn) {
     if (strcmp(uri, "/api/stats") == 0) {
         handle_stats(conn, srv);
     } else if (strcmp(uri, "/api/upstreams") == 0) {
-        handle_upstreams(conn, srv);
+        if (strcmp(method, "POST") == 0) handle_upstreams_add(conn, srv);
+        else if (strcmp(method, "DELETE") == 0) handle_upstreams_delete(conn, srv);
+        else handle_upstreams(conn, srv);
     } else if (strcmp(uri, "/api/rules") == 0) {
         if (strcmp(method, "POST") == 0) handle_rules_add(conn, srv);
         else if (strcmp(method, "DELETE") == 0) handle_rules_delete(conn, srv);
+        else if (strcmp(method, "PUT") == 0) handle_rules_update(conn, srv);
         else handle_rules_list(conn, srv);
     } else if (strncmp(uri, "/api/sessions", 13) == 0) {
         handle_sessions(conn, srv);
