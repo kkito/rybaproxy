@@ -71,6 +71,17 @@ static void print_banner(const startup_info_t *info, int detached) {
     }
 }
 
+/* 守护进程就绪握手的写端；前台模式为 -1 */
+static int g_ready_fd = -1;
+
+static void ready_ok(void) {
+    if (g_ready_fd >= 0) { daemon_report(g_ready_fd, NULL); g_ready_fd = -1; }
+}
+
+static void ready_fail(const char *msg) {
+    if (g_ready_fd >= 0) { daemon_report(g_ready_fd, msg); g_ready_fd = -1; }
+}
+
 static int cmd_stop(const char *config_path) {
     config_t cfg;
     config_init_defaults(&cfg);
@@ -128,18 +139,31 @@ static int cmd_start(const char *config_path, int detach) {
         (void)pidfile_remove(cfg.pid_file);
     }
 
-    /* 守护化：父进程只负责告知"起来了"，其余初始化全部在守护进程里做 */
+    /* 守护化：父进程只负责等就绪并告知结果，其余初始化全部在守护进程里做 */
     if (detach) {
-        pid_t dpid = daemon_detach();
+        int rfd = -1;
+        pid_t dpid = daemon_detach(&rfd);
         if (dpid < 0) {
             fprintf(stderr, "error: daemon_detach failed\n");
             return 1;
         }
         if (dpid > 0) {
-            printf("rybaproxy started in background (pid %d), log: %s\n", (int)dpid, cfg.log_file);
+            /* 父进程：必须等守护进程真正就绪，失败要把原因带出来，
+             * 否则守护进程起不来时这里照样打印成功。 */
+            char why[256] = {0};
+            int ok = daemon_wait_ready(rfd, why, sizeof why, 60);
+            if (!ok) {
+                fprintf(stderr, "error: rybaproxy failed to start: %s\n", why[0] ? why : "unknown");
+                return 1;
+            }
+            printf("rybaproxy started in background (pid %d)\n", (int)dpid);
+            printf("  web       http://127.0.0.1:%d\n", cfg.web_port);
+            printf("  log       %s\n", cfg.log_file);
             fflush(stdout);
             return 0;
         }
+        /* 守护进程：记下写端，启动成功/失败都要回报 */
+        g_ready_fd = rfd;
     }
 
     if (pidfile_write(cfg.pid_file, (long)getpid()) != 0)
@@ -154,8 +178,12 @@ static int cmd_start(const char *config_path, int detach) {
 
     g_srv = calloc(1, sizeof *g_srv);
     if (server_init(g_srv, &cfg) != 0) {
+        /* 致命错误必须同时打到终端：日志文件里的东西没人看 */
+        fprintf(stderr, "error: server_init failed (listen http %d / socks5 %d; another instance running?)\n",
+                cfg.http_port, cfg.socks5_port);
         LOG_ERROR("server_init failed");
         (void)pidfile_remove(cfg.pid_file);
+        ready_fail("server_init failed (port in use?)");
         return 1;
     }
 
@@ -200,8 +228,12 @@ static int cmd_start(const char *config_path, int detach) {
         info.geo_site_count = geo_site_count() ? (int)geo_site_count() : -1;
         info.geo_cache_size = cfg.geo_cache_size;
         info.detached = detach;
+        snprintf(info.web_url, sizeof info.web_url, "http://127.0.0.1:%d", cfg.web_port);
         print_banner(&info, detach);
     }
+
+    /* 到这里才真正能干活了：通知父进程，然后进入事件循环 */
+    ready_ok();
 
     server_run(g_srv);
 

@@ -53,7 +53,8 @@ size_t startup_info_text(const startup_info_t *i, char *out, size_t outsz) {
         "  %-10s%s (%s)\n"
         "  %-10s%s\n"
         "  %-10s%ld\n"
-        "  %-10shttp %d | socks5 %d | web %d\n"
+        "  %-10shttp %d | socks5 %d\n"
+        "  %-10s%s\n"
         "  %-10s%d (%s)\n"
         "  %-10s%d\n"
         "  %-10s%s\n",
@@ -64,7 +65,8 @@ size_t startup_info_text(const startup_info_t *i, char *out, size_t outsz) {
         "log", i->log_file, i->log_level,
         "pidfile", i->pid_file,
         "pid", i->pid,
-        "listen", i->http_port, i->socks5_port, i->web_port,
+        "listen", i->http_port, i->socks5_port,
+        "web", i->web_url[0] ? i->web_url : "(not started)",
         "upstreams", i->upstream_count, i->upstreams[0] ? i->upstreams : "(none)",
         "rules", i->rule_count,
         "geo", geo);

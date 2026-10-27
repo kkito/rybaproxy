@@ -78,7 +78,9 @@ static void test_detach_spawns_daemon(void **state) {
     assert_true(child >= 0);
     if (child == 0) {
         close(fds[0]);
-        pid_t d = daemon_detach();
+        int rfd = -1;
+        pid_t d = daemon_detach(&rfd);
+        if (rfd >= 0) close(rfd);
         if (d <= 0) _exit(d == 0 ? 0 : 3);   /* 0=我是守护进程 */
         /* 父进程路径：把守护 pid 写回管道后退出 */
         if (write(fds[1], &d, sizeof d) != (ssize_t)sizeof d) _exit(4);
@@ -162,9 +164,50 @@ static void test_stop_escalates_to_sigkill(void **state) {
     assert_int_equal(pidfile_probe(path), PIDFILE_MISSING);
 }
 
+/* 就绪握手：守护进程写 OK，父进程必须读到 1。
+ * 没有这个握手，父进程会在守护进程启动失败后仍然谎报成功。 */
+static void test_ready_handshake_ok(void **s) {
+    (void)s;
+    int fds[2];
+    assert_int_equal(pipe(fds), 0);
+    daemon_report(fds[1], NULL);
+    close(fds[1]);
+    char err[128] = "unset";
+    assert_int_equal(daemon_wait_ready(fds[0], err, sizeof err, 5), 1);
+    close(fds[0]);
+}
+
+/* 守护进程写错误原因，父进程必须原样拿到并返回 0 */
+static void test_ready_handshake_error(void **s) {
+    (void)s;
+    int fds[2];
+    assert_int_equal(pipe(fds), 0);
+    daemon_report(fds[1], "listen http 8080 failed");
+    close(fds[1]);
+    char err[128] = {0};
+    assert_int_equal(daemon_wait_ready(fds[0], err, sizeof err, 5), 0);
+    assert_string_equal(err, "listen http 8080 failed");
+    close(fds[0]);
+}
+
+/* 守护进程一声不响就死了：父进程必须超时返回 0，不能干等 */
+static void test_ready_handshake_timeout(void **s) {
+    (void)s;
+    int fds[2];
+    assert_int_equal(pipe(fds), 0);
+    close(fds[1]);                 /* 对端直接关闭：相当于启动中崩溃 */
+    char err[128] = {0};
+    assert_int_equal(daemon_wait_ready(fds[0], err, sizeof err, 1), 0);
+    assert_true(err[0] != '\0');
+    close(fds[0]);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test_setup_teardown(test_detach_spawns_daemon, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_ready_handshake_ok, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_ready_handshake_error, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_ready_handshake_timeout, setup, teardown),
         cmocka_unit_test_setup_teardown(test_stop_terminates_child, setup, teardown),
         cmocka_unit_test_setup_teardown(test_stop_when_not_running, setup, teardown),
         cmocka_unit_test_setup_teardown(test_stop_clears_stale, setup, teardown),

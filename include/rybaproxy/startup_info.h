@@ -21,6 +21,7 @@ typedef struct {
     int http_port;
     int socks5_port;
     int web_port;
+    char web_url[128];   /* 管理页完整 URL，如 http://127.0.0.1:9090 */
     char upstreams[512];   /* upstream_summary() 的输出 */
     int upstream_count;
     int rule_count;

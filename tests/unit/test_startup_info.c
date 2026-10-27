@@ -22,6 +22,7 @@ static startup_info_t mk(void) {
     i.http_port = 8080;
     i.socks5_port = 1080;
     i.web_port = 9090;
+    snprintf(i.web_url, sizeof i.web_url, "http://127.0.0.1:9090");
     i.upstream_count = 2;
     i.rule_count = 3;
     i.geo_ip_count = 10011;
@@ -43,7 +44,9 @@ static void test_banner_has_all_facts(void **s) {
     assert_non_null(strstr(out, "log       /home/u/.local/rybaproxy/rybaproxy.log (info)"));
     assert_non_null(strstr(out, "pidfile   /home/u/.local/rybaproxy/rybaproxy.pid"));
     assert_non_null(strstr(out, "pid       4242"));
-    assert_non_null(strstr(out, "listen    http 8080 | socks5 1080 | web 9090"));
+    assert_non_null(strstr(out, "listen    http 8080 | socks5 1080"));
+    /* 管理页地址必须单独一行给出完整 URL，运维直接拷 */
+    assert_non_null(strstr(out, "web       http://127.0.0.1:9090"));
     assert_non_null(strstr(out, "rules     3"));
     assert_non_null(strstr(out, "geo       ip=10011 site=110276 (cache 512)"));
 }
