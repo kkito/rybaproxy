@@ -42,6 +42,7 @@ void config_init_defaults(config_t *c) {
     ryba_default_db_path(getenv("HOME"), c->db_path, sizeof c->db_path);
     c->geo_dir[0] = '\0';
     ryba_default_log_path(getenv("HOME"), c->log_file, sizeof c->log_file);
+    ryba_default_pid_path(getenv("HOME"), c->pid_file, sizeof c->pid_file);
     snprintf(c->log_level, sizeof c->log_level, "info");
     c->geo_cache_size = 512;
     c->retention_days = 90;
@@ -102,6 +103,7 @@ int config_load(const char *path, config_t *c) {
         copy_str(c->db_path, sizeof c->db_path, stats, "db_path");
         copy_str(c->geo_dir, sizeof c->geo_dir, stats, "geo_dir");
         copy_str(c->log_file, sizeof c->log_file, stats, "log_file");
+        copy_str(c->pid_file, sizeof c->pid_file, stats, "pid_file");
         copy_str(c->log_level, sizeof c->log_level, stats, "log_level");
         int n = get_int(stats, "geo_cache_size", c->geo_cache_size);
         c->geo_cache_size = n < 0 ? 0 : (n > 4096 ? 4096 : n);

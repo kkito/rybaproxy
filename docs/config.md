@@ -8,7 +8,6 @@
 {
   "log_level": "info",
   "log_file": "/var/log/rybaproxy/rybaproxy.log",
-  "pid_file": "/var/run/rybaproxy.pid",
 
   "proxy": {
     "http_listen": "0.0.0.0:8080",
@@ -53,6 +52,7 @@
     "db_path": "~/.local/rybaproxy/rybaproxy.db",
     "log_file": "~/.local/rybaproxy/rybaproxy.log",
     "log_level": "info",
+    "pid_file": "~/.local/rybaproxy/rybaproxy.pid",
     "geo_cache_size": 512,
     "retention_days": 90,
     "aggregate_retention_days": 365,

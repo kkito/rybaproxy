@@ -24,6 +24,7 @@ typedef struct {
     char db_path[512];
     char geo_dir[512];
     char log_file[512];
+    char pid_file[512];
     char log_level[16];
     int geo_cache_size;
     int retention_days;

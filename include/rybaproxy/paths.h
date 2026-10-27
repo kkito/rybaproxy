@@ -33,6 +33,15 @@ static inline int ryba_default_log_path(const char *home, char *out, size_t outs
     return 0;
 }
 
+/* 默认 pidfile 路径：<data_dir>/rybaproxy.pid */
+static inline int ryba_default_pid_path(const char *home, char *out, size_t outsz) {
+    char dir[512];
+    if (!out || outsz == 0) return -1;
+    if (ryba_data_dir(home, dir, sizeof dir) != 0) return -1;
+    snprintf(out, outsz, "%s/rybaproxy.pid", dir);
+    return 0;
+}
+
 /* 递归建目录（含父目录），已存在也算成功 */
 static inline int ryba_ensure_dir(const char *dir) {
     if (!dir || !*dir) return -1;

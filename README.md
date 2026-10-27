@@ -6,11 +6,30 @@
 
 设计文档见 `docs/`。
 
-## 快速开始（规划）
+## 快速开始
 
 ```sh
 make
-./build/rybaproxy -c docs/../config.json  # 待实现
+./build/rybaproxy -c config.json          # 前台运行（同 rybaproxy start）
 ```
 
-当前阶段：设计文档已完成，代码实现待开始。
+### 命令行
+
+```
+Usage: rybaproxy [start|stop] [options]
+
+Commands:
+  start                start the proxy in the foreground (default)
+  stop                 stop the running instance (via pidfile)
+
+Options:
+  -c, --config FILE    config file path
+  -d, --detach         run as a background daemon (start only)
+  -h, --help           show this help
+  -v, --version        show version
+```
+
+- `rybaproxy start` 前台运行，启动时打印一屏基本信息（版本、路径、监听端口、上游、规则、geo 状态）。
+- `rybaproxy start -d` 守护进程化：父进程只打印 `pid` 与日志路径，详细信息写入日志文件。
+- `rybaproxy stop` 读 `stats.pid_file`（默认 `<数据目录>/rybaproxy.pid`）→ `SIGTERM` → 等 10 秒 → 超时升级 `SIGKILL` → 删 pidfile。本来没在跑也算成功。
+- 任何模式都会写 pidfile；已有一个实例在跑时重复启动会被拒绝（提示现有 pid）。

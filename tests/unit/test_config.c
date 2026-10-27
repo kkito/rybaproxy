@@ -30,6 +30,25 @@ static void test_config_defaults_data_dir(void **state) {
     assert_string_equal(c.geo_dir, "");
     assert_string_equal(c.log_level, "info");
     assert_int_equal(c.geo_cache_size, 512);
+    if (home && *home) {
+        char expect[600];
+        snprintf(expect, sizeof expect, "%s/.local/rybaproxy/rybaproxy.pid", home);
+        assert_string_equal(c.pid_file, expect);
+    }
+}
+
+/* pid_file 必须可配：多实例/测试要用临时 pidfile，不能写死数据目录 */
+static void test_config_pid_file_override(void **s) {
+    (void)s;
+    const char *cfg = "/tmp/ryba_cfg_pid.json";
+    FILE *f = fopen(cfg, "w");
+    fprintf(f, "{\"stats\":{\"pid_file\":\"/tmp/custom.pid\"}}");
+    fclose(f);
+    config_t c;
+    config_init_defaults(&c);
+    assert_int_equal(config_load(cfg, &c), 0);
+    assert_string_equal(c.pid_file, "/tmp/custom.pid");
+    remove(cfg);
 }
 
 static void test_config_load_geo_dir(void **state) {
@@ -93,6 +112,7 @@ int main(void) {
         cmocka_unit_test(test_config_load_geo_dir),
         cmocka_unit_test(test_config_load),
         cmocka_unit_test(test_config_defaults_db_log_cache),
+        cmocka_unit_test(test_config_pid_file_override),
         cmocka_unit_test(test_log_level_parse),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
