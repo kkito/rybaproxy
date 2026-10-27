@@ -215,6 +215,10 @@ static void send_json(struct mg_connection *conn, int status, const char *body) 
     mg_write(conn, body, strlen(body));
 }
 
+int valid_geo(const char *s) {
+    return !s || !*s || strcmp(s, "cn") == 0 || strcmp(s, "!cn") == 0;
+}
+
 static void send_envelope(struct mg_connection *conn, int status, char *env) {
     if (!env) { send_json(conn, 500, "{\"ok\":false,\"error\":{\"code\":\"INTERNAL\",\"message\":\"alloc\"}}"); return; }
     send_json(conn, status, env);
@@ -390,6 +394,14 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             cJSON *v;
             if ((v = cJSON_GetObjectItem(j, "domain_pattern")) && cJSON_IsString(v)) snprintf(r.domain_pattern, sizeof r.domain_pattern, "%s", v->valuestring);
             if ((v = cJSON_GetObjectItem(j, "ip_cidr")) && cJSON_IsString(v)) snprintf(r.ip_cidr, sizeof r.ip_cidr, "%s", v->valuestring);
+            if ((v = cJSON_GetObjectItem(j, "geo_ip")) && cJSON_IsString(v)) {
+                if (!valid_geo(v->valuestring)) { cJSON_Delete(j); send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "geo_ip must be cn or !cn")); return; }
+                snprintf(r.geo_ip, sizeof r.geo_ip, "%s", v->valuestring);
+            }
+            if ((v = cJSON_GetObjectItem(j, "geo_site")) && cJSON_IsString(v)) {
+                if (!valid_geo(v->valuestring)) { cJSON_Delete(j); send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "geo_site must be cn or !cn")); return; }
+                snprintf(r.geo_site, sizeof r.geo_site, "%s", v->valuestring);
+            }
             if ((v = cJSON_GetObjectItem(j, "port"))) r.port = v->valueint;
             if ((v = cJSON_GetObjectItem(j, "priority"))) r.priority = v->valueint;
             if ((v = cJSON_GetObjectItem(j, "upstream_id"))) r.upstream_id = v->valueint;
@@ -400,8 +412,8 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             }
             if ((v = cJSON_GetObjectItem(j, "name")) && cJSON_IsString(v)) snprintf(r.name, sizeof r.name, "%s", v->valuestring);
             cJSON_Delete(j);
-            if (!r.domain_pattern[0] && !r.ip_cidr[0]) {
-                send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "domain_pattern or ip_cidr required"));
+            if (!r.domain_pattern[0] && !r.ip_cidr[0] && !r.geo_ip[0] && !r.geo_site[0]) {
+                send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "domain_pattern, ip_cidr or geo condition required"));
                 return;
             }
             pthread_mutex_lock(&srv->lock);
@@ -434,6 +446,14 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
                     cJSON *v;
                     if ((v = cJSON_GetObjectItem(j, "domain_pattern")) && cJSON_IsString(v)) snprintf(r->domain_pattern, sizeof r->domain_pattern, "%s", v->valuestring);
                     if ((v = cJSON_GetObjectItem(j, "ip_cidr")) && cJSON_IsString(v)) snprintf(r->ip_cidr, sizeof r->ip_cidr, "%s", v->valuestring);
+                    if ((v = cJSON_GetObjectItem(j, "geo_ip")) && cJSON_IsString(v)) {
+                        if (!valid_geo(v->valuestring)) { pthread_mutex_unlock(&srv->lock); cJSON_Delete(j); send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "geo_ip must be cn or !cn")); return; }
+                        snprintf(r->geo_ip, sizeof r->geo_ip, "%s", v->valuestring);
+                    }
+                    if ((v = cJSON_GetObjectItem(j, "geo_site")) && cJSON_IsString(v)) {
+                        if (!valid_geo(v->valuestring)) { pthread_mutex_unlock(&srv->lock); cJSON_Delete(j); send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "geo_site must be cn or !cn")); return; }
+                        snprintf(r->geo_site, sizeof r->geo_site, "%s", v->valuestring);
+                    }
                     if ((v = cJSON_GetObjectItem(j, "port"))) r->port = v->valueint;
                     if ((v = cJSON_GetObjectItem(j, "priority"))) r->priority = v->valueint;
                     if ((v = cJSON_GetObjectItem(j, "upstream_id"))) r->upstream_id = v->valueint;
@@ -462,6 +482,8 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             cJSON_AddNumberToObject(o, "priority", r->priority);
             cJSON_AddBoolToObject(o, "enabled", r->enabled);
             cJSON_AddStringToObject(o, "domain_pattern", r->domain_pattern);
+            cJSON_AddStringToObject(o, "geo_ip", r->geo_ip);
+            cJSON_AddStringToObject(o, "geo_site", r->geo_site);
             cJSON_AddStringToObject(o, "ip_cidr", r->ip_cidr);
             cJSON_AddNumberToObject(o, "port", r->port);
             const char *ps = "any";

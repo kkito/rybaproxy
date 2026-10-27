@@ -7,6 +7,7 @@
 #include "rybaproxy/db.h"
 #include "rybaproxy/session.h"
 #include "rybaproxy/web_api.h"
+#include "rybaproxy/router.h"
 
 static char g_tmpdb[128];
 
@@ -170,6 +171,16 @@ static void test_session_get_by_id(void **state) {
     assert_int_equal(db_get_session_by_id(999999999LL, buf, sizeof buf), 1);
 }
 
+static void test_rule_geo_validation(void **state) {
+    (void)state;
+    /* 白名单校验：非法值拒绝，合法值 + 空值通过 */
+    assert_int_equal(valid_geo(""), 1);
+    assert_int_equal(valid_geo("cn"), 1);
+    assert_int_equal(valid_geo("!cn"), 1);
+    assert_int_equal(valid_geo("us"), 0);
+    assert_int_equal(valid_geo("CN"), 0);
+}
+
 static void test_settings_roundtrip(void **state) {
     (void)state;
     assert_int_equal(db_settings_set("k1", "v1"), 0);
@@ -192,6 +203,7 @@ int main(void) {
         cmocka_unit_test(test_upstream_update_not_found),
         cmocka_unit_test(test_upstream_update_ok),
         cmocka_unit_test(test_upstream_update_auth_persist),
+        cmocka_unit_test(test_rule_geo_validation),
         cmocka_unit_test_setup_teardown(test_session_get_by_id, setup, teardown),
         cmocka_unit_test_setup_teardown(test_settings_roundtrip, setup, teardown),
     };

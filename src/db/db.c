@@ -46,6 +46,8 @@ static const char *SCHEMA =
 " id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, priority INTEGER NOT NULL DEFAULT 100,"
 " enabled INTEGER NOT NULL DEFAULT 1, domain_pattern TEXT, ip_cidr TEXT, port INTEGER DEFAULT 0,"
 " protocol TEXT DEFAULT 'any', upstream_id INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);"
+"ALTER TABLE rules ADD COLUMN geo_ip TEXT DEFAULT '';"
+"ALTER TABLE rules ADD COLUMN geo_site TEXT DEFAULT '';"
 "CREATE TABLE IF NOT EXISTS sessions ("
 " id INTEGER PRIMARY KEY, protocol TEXT NOT NULL, client_ip TEXT NOT NULL, target_host TEXT NOT NULL,"
 " target_port INTEGER NOT NULL, method TEXT, upstream_id INTEGER, upstream_name TEXT, status INTEGER NOT NULL,"

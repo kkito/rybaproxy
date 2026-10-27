@@ -11,6 +11,8 @@ char *web_envelope_paged(const char *inner_paged_json);
 
 /* pure logic helpers (unit-testable, no socket) */
 int web_rules_reload(router_t *r);
+/* geo 值白名单：""/"cn"/"!cn" 合法 */
+int valid_geo(const char *s);
 int web_upstreams_update(server_ctx_t *srv, int id, const char *body, char **out_envelope, int *out_status);
 
 /* ring log */
