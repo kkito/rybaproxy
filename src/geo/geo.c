@@ -31,6 +31,7 @@ static int read_varint(const unsigned char **pp, const unsigned char *end, uint6
 typedef struct { unsigned char addr[16]; int bits; int is6; } cidr_t;
 static cidr_t *g_cidrs = NULL;
 static size_t g_cidr_n = 0, g_cidr_cap = 0;
+static void geo_tables_clear(void);
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
 static void cidr_push(const unsigned char *ip, size_t iplen, int prefix) {
@@ -308,6 +309,12 @@ int geo_init(void) { return 0; }
 
 void geo_free(void) {
     pthread_mutex_lock(&g_lock);
+    geo_tables_clear();
+    g_loaded = 0;
+    pthread_mutex_unlock(&g_lock);
+}
+
+static void geo_tables_clear(void) {
     free(g_cidrs); g_cidrs = NULL; g_cidr_n = g_cidr_cap = 0;
     for (size_t i = 0; i < g_suffix_n; i++) free(g_suffix[i].rev);
     free(g_suffix); g_suffix = NULL; g_suffix_n = g_suffix_cap = 0;
@@ -315,8 +322,6 @@ void geo_free(void) {
     free(g_exact); g_exact = NULL; g_exact_n = g_exact_cap = 0;
     for (size_t i = 0; i < g_re_n; i++) regfree(&g_res[i]);
     free(g_res); g_res = NULL; g_re_n = g_re_cap = 0;
-    g_loaded = 0;
-    pthread_mutex_unlock(&g_lock);
 }
 
 int geo_db_loaded(void) { return g_loaded; }
@@ -330,6 +335,7 @@ int geo_load(const char *dir) {
     snprintf(p2, sizeof p2, "%s/geosite.dat", dir);
     int ok = 0;
     pthread_mutex_lock(&g_lock);
+    geo_tables_clear();
     size_t n = 0;
     unsigned char *b = read_file(p1, &n);
     if (b) { if (parse_dat(b, n, 1) == 0) ok |= 1; free(b); }

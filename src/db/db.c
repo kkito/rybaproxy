@@ -46,9 +46,12 @@ static const char *SCHEMA =
 "CREATE TABLE IF NOT EXISTS rules ("
 " id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, priority INTEGER NOT NULL DEFAULT 100,"
 " enabled INTEGER NOT NULL DEFAULT 1, domain_pattern TEXT, ip_cidr TEXT, port INTEGER DEFAULT 0,"
-" protocol TEXT DEFAULT 'any', upstream_id INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);"
-"ALTER TABLE rules ADD COLUMN geo_ip TEXT DEFAULT '';"
-"ALTER TABLE rules ADD COLUMN geo_site TEXT DEFAULT '';"
+" protocol TEXT DEFAULT 'any', upstream_id INTEGER NOT NULL, geo_ip TEXT DEFAULT '', geo_site TEXT DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);";
+static const char *RULES_MIGRATIONS[] = {
+"ALTER TABLE rules ADD COLUMN geo_ip TEXT DEFAULT '';",
+"ALTER TABLE rules ADD COLUMN geo_site TEXT DEFAULT '';",
+};
+static const char *SCHEMA_TAIL =
 "CREATE TABLE IF NOT EXISTS sessions ("
 " id INTEGER PRIMARY KEY, protocol TEXT NOT NULL, client_ip TEXT NOT NULL, target_host TEXT NOT NULL,"
 " target_port INTEGER NOT NULL, method TEXT, upstream_id INTEGER, upstream_name TEXT, status INTEGER NOT NULL,"
@@ -103,7 +106,14 @@ int db_init(const char *path) {
     char *err = NULL;
     sqlite3_exec(g_db, "PRAGMA journal_mode=WAL;", NULL, NULL, &err);
     sqlite3_exec(g_db, SCHEMA, NULL, NULL, &err);
-    if (err) { fprintf(stderr, "schema err: %s\n", err); sqlite3_free(err); }
+    sqlite3_exec(g_db, SCHEMA_TAIL, NULL, NULL, &err);
+    if (err) { sqlite3_free(err); err = NULL; }
+    /* 历史库补列：geo_ip/geo_site（新库 SCHEMA 已含，只对老库生效） */
+    for (size_t i = 0; i < sizeof RULES_MIGRATIONS / sizeof RULES_MIGRATIONS[0]; i++) {
+        char *merr = NULL;
+        sqlite3_exec(g_db, RULES_MIGRATIONS[i], NULL, NULL, &merr);
+        if (merr) sqlite3_free(merr); /* duplicate column 等可忽略 */
+    }
     /* schema version */
     sqlite3_exec(g_db, "INSERT INTO schema_version(version) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM schema_version);", NULL, NULL, NULL);
 

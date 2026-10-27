@@ -104,6 +104,19 @@ static void test_load_missing_dir(void **s) {
     assert_int_equal(geo_load("/tmp/ryba_geo_no_such_dir_xyz"), -1);
 }
 
+static void test_reload_replaces_without_dup(void **s) {
+    (void)s;
+    /* 同一目录连 load 两次：第二次先清空再装，计数不变 */
+    write_dat("geoip.dat", kIpEntry, sizeof kIpEntry);
+    write_dat("geosite.dat", kSiteEntry, sizeof kSiteEntry);
+    assert_int_equal(geo_load(g_dir), 0);
+    size_t ip1 = geo_ip_count(), site1 = geo_site_count();
+    assert_true(ip1 == 1 && site1 >= 1);
+    assert_int_equal(geo_load(g_dir), 0);
+    assert_int_equal(geo_ip_count(), ip1);
+    assert_int_equal(geo_site_count(), site1);
+}
+
 int main(void) {
     const struct CMUnitTest t[] = {
         cmocka_unit_test_setup_teardown(test_private_is_cn, setup, teardown),
@@ -111,6 +124,7 @@ int main(void) {
         cmocka_unit_test_setup_teardown(test_db_unloaded, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_wire_dat, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_missing_dir, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_reload_replaces_without_dup, setup, teardown),
     };
     return cmocka_run_group_tests(t, NULL, NULL);
 }
