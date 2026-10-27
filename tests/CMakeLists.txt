@@ -17,6 +17,7 @@ add_ryba_test(test_stats unit/test_stats.c)
 add_ryba_test(test_db unit/test_db.c)
 add_ryba_test(test_upstream_probe unit/test_upstream_probe.c)
 add_ryba_test(test_web_api unit/test_web_api.c)
+add_ryba_test(test_geo unit/test_geo.c)
 
 add_executable(test_web_page unit/test_web_page.c)
 target_link_libraries(test_web_page PRIVATE cmocka::cmocka)
