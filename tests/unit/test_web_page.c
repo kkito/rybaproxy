@@ -65,11 +65,30 @@ static void test_page_geo_hooks_tail(void **state) {
     assert_true(strstr(WEB_PAGE_HTML, "库未加载") != NULL);
 }
 
+static void test_page_geo_js_no_raw_newline_in_string(void **state) {
+    (void)state;
+    /* RED: 单引号 JS 字符串里不许出现裸换行（C 的 \n 会变成真换行 → SyntaxError，整页 script 瘫痪） */
+    /* db_loaded 三元里的提示必须是转义 \n（两字符），不能是真换行 */
+    assert_true(strstr(WEB_PAGE_HTML, "? '\\n") != NULL);
+}
+
+static void test_page_geo_status_updated_on_success(void **state) {
+    (void)state;
+    /* RED: reloadGeoStatus 成功路径必须更新 #geoStatus，否则永远显示“加载中…” */
+    const char *p = WEB_PAGE_HTML;
+    int n = 0;
+    while ((p = strstr(p, "getElementById('geoStatus')")) != NULL) { n++; p++; }
+    assert_true(n >= 2);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_page_uses_real_apis),
         cmocka_unit_test(test_page_has_hooks),
         cmocka_unit_test(test_page_geo_hooks),
+        cmocka_unit_test(test_page_geo_hooks_tail),
+        cmocka_unit_test(test_page_geo_js_no_raw_newline_in_string),
+        cmocka_unit_test(test_page_geo_status_updated_on_success),
         cmocka_unit_test(test_page_layout_stack),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
