@@ -44,8 +44,8 @@ int router_remove_rule(router_t *r, int id) {
     return -1;
 }
 
-/* geo 条件匹配：cn/-1(未知)/其它。未知一律不匹配（空库/非法值都不许分流，走默认）。
- * 纯函数：把两处重复的 if 链收敛到一处。 */
+/* geo 条件匹配（纯函数）：无条件恒成立，否则只在已知命中/未命中时判定。
+ * 关键：cond 为空时必须短路，调用方不得发起 DNS/查表（零网络要求）。 */
 static int geo_cond_matches(const char *cond, int cn) {
     if (!cond || !cond[0]) return 1; /* 无条件恒成立 */
     if (cn < 0) return 0;
@@ -65,8 +65,9 @@ static int rule_matches(const rule_t *rule, const char *host, int port, protocol
         if (!match_cidr(rule->ip_cidr, client_ip ? client_ip : "")) return 0;
         /* if domain rule also has cidr, require both; ip-only rules should leave domain empty */
     }
-    if (!geo_cond_matches(rule->geo_ip, geo_host_is_cn(host))) return 0;
-    if (!geo_cond_matches(rule->geo_site, geo_site_is_cn(host))) return 0;
+    /* 条件为空直接跳过查询：geo_host_is_cn 含 DNS，空条件调用即浪费一次解析 */
+    if (rule->geo_ip[0] && !geo_cond_matches(rule->geo_ip, geo_host_is_cn(host))) return 0;
+    if (rule->geo_site[0] && !geo_cond_matches(rule->geo_site, geo_site_is_cn(host))) return 0;
     return 1;
 }
 

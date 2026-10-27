@@ -88,9 +88,36 @@ static int geo_setup(void **s) {
 static int geo_teardown(void **s) {
     (void)s;
     geo_free();
+    /* resolver 必须随 geo_free 复位为 NULL（否则跨用例残留 fake） */
+    assert_null(geo_test_get_resolver());
     char cmd[256];
     snprintf(cmd, sizeof cmd, "rm -rf %s", g_dir);
     (void)system(cmd);
+    return 0;
+}
+/* 网络哨兵：geo_site 路径不许解析 DNS，被调用即失败 */
+int must_not_resolve_netcheck(const char *host, char *ip_out, size_t ipsz) {
+    (void)host; (void)ip_out; (void)ipsz;
+    fail_msg("geo_site path must not touch DNS");
+    return -1;
+}
+/* fake DNS 解析器（测试替身）：全程不碰真实网络 */
+int ryba_test_fake_dns(const char *host, char *ip_out, size_t ipsz) {
+    (void)host;
+    snprintf(ip_out, ipsz, "%s", "1.2.3.9"); /* CN 表内 */
+    return 0;
+}
+int ryba_test_fake_dns_noncn(const char *host, char *ip_out, size_t ipsz) {
+    (void)host;
+    snprintf(ip_out, ipsz, "%s", "9.9.9.9"); /* CN 表外 */
+    return 0;
+}
+static int *g_count_ptr = NULL;
+void ryba_test_dns_count_reset(int *p) { g_count_ptr = p; }
+int ryba_test_fake_dns_count(const char *host, char *ip_out, size_t ipsz) {
+    (void)host;
+    if (g_count_ptr) (*g_count_ptr)++;
+    snprintf(ip_out, ipsz, "%s", "1.2.3.9");
     return 0;
 }
 static void test_rule_geo_ip_cn(void **s) {
@@ -101,6 +128,11 @@ static void test_rule_geo_ip_cn(void **s) {
     router_add_rule(&r, &rule);
     assert_int_equal(router_select(&r, "1.2.3.9", 80, PROTO_HTTP, NULL), 5);
     assert_int_equal(router_select(&r, "9.9.9.9", 80, PROTO_HTTP, NULL), -1);
+    /* 注入 fake DNS（1.2.3.9=CN 表内）：域名全走 mock，不碰真实网络 */
+    extern int ryba_test_fake_dns(const char *host, char *ip_out, size_t ipsz);
+    geo_set_resolver(ryba_test_fake_dns);
+    assert_int_equal(router_select(&r, "any.example", 80, PROTO_HTTP, NULL), 5);
+    geo_set_resolver(NULL);
     router_free(&r);
 }
 static void test_rule_geo_ip_neg(void **s) {
@@ -111,16 +143,25 @@ static void test_rule_geo_ip_neg(void **s) {
     router_add_rule(&r, &rule);
     assert_int_equal(router_select(&r, "9.9.9.9", 80, PROTO_HTTP, NULL), 6);
     assert_int_equal(router_select(&r, "1.2.3.9", 80, PROTO_HTTP, NULL), -1);
+    /* fake DNS 返回非 CN 公网 IP：!cn 条件命中，全程无真实网络 */
+    extern int ryba_test_fake_dns_noncn(const char *host, char *ip_out, size_t ipsz);
+    geo_set_resolver(ryba_test_fake_dns_noncn);
+    assert_int_equal(router_select(&r, "any.example", 80, PROTO_HTTP, NULL), 6);
+    geo_set_resolver(NULL);
     router_free(&r);
 }
 static void test_rule_geo_site_cn(void **s) {
     (void)s;
+    /* 注意：geo_site 规则走 geo_site_is_cn 纯查表，必须零网络。
+     * 若 DNS 出现则说明实现漏了网络调用（曾有 5s 延迟 bug），fail_msg 会抓现行。 */
+    geo_set_resolver(must_not_resolve_netcheck);
     router_t r; router_init(&r, "direct", 1);
     rule_t rule = {0}; rule.id=1; rule.priority=100; rule.enabled=1;
     strcpy(rule.geo_site, "cn"); rule.upstream_id=7;
     router_add_rule(&r, &rule);
     assert_int_equal(router_select(&r, "a.example.cn", 80, PROTO_HTTP, NULL), 7);
     assert_int_equal(router_select(&r, "a.example.com", 80, PROTO_HTTP, NULL), -1);
+    geo_set_resolver(NULL);
     router_free(&r);
 }
 static void test_rule_geo_empty_db_no_match(void **s) {
@@ -143,6 +184,15 @@ static void test_rule_geo_empty_db_no_match(void **s) {
     rule_t rule4 = {0}; rule4.id=4; rule4.priority=100; rule4.enabled=1;
     strcpy(rule4.geo_site, "!cn"); rule4.upstream_id=8;
     router_add_rule(&r, &rule4);
+    /* 空库时即使注入必成功的 resolver 也不许被调用：直接未知走默认 */
+    static int g_called = 0;
+    extern int ryba_test_fake_dns_count(const char *host, char *ip_out, size_t ipsz);
+    g_called = 0;
+    ryba_test_dns_count_reset(&g_called);
+    geo_set_resolver(ryba_test_fake_dns_count);
+    assert_int_equal(router_select(&r, "any.example", 80, PROTO_HTTP, NULL), -1);
+    assert_int_equal(g_called, 0);
+    geo_set_resolver(NULL);
     /* IP 字面量不碰 DNS：空库未知一律走默认 */
     assert_int_equal(router_select(&r, "1.2.3.9", 80, PROTO_HTTP, NULL), -1);
     assert_int_equal(router_select(&r, "8.8.8.8", 80, PROTO_HTTP, NULL), -1);
@@ -157,12 +207,14 @@ static void test_rule_geo_empty_db_no_match(void **s) {
 }
 static void test_rule_geo_and_domain(void **s) {
     (void)s;
+    geo_set_resolver(must_not_resolve_netcheck);
     router_t r; router_init(&r, "direct", 1);
     rule_t rule = {0}; rule.id=1; rule.priority=100; rule.enabled=1;
     strcpy(rule.domain_pattern, "*.example.cn"); strcpy(rule.geo_site, "cn"); rule.upstream_id=8;
     router_add_rule(&r, &rule);
     assert_int_equal(router_select(&r, "a.example.cn", 80, PROTO_HTTP, NULL), 8);
     assert_int_equal(router_select(&r, "b.other.cn", 80, PROTO_HTTP, NULL), -1);
+    geo_set_resolver(NULL);
     router_free(&r);
 }
 

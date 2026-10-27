@@ -14,6 +14,9 @@ int geo_ip_is_cn(const char *ip);
 int geo_site_is_cn(const char *host);
 /* 域名→DNS解析→查段：1=CN 0=非CN -1=未知/DNS失败；5分钟缓存 */
 int geo_host_is_cn(const char *host);
+/* DNS 解析器注入（测试用 mock；NULL=用系统 getaddrinfo）。返回 0 成功并写 ip_out */
+typedef int (*geo_resolver_fn)(const char *host, char *ip_out, size_t ipsz);
+void geo_set_resolver(geo_resolver_fn fn);
 /* 从目录加载 geoip.dat + geosite.dat；缺文件返回-1（旧数据保留） */
 int geo_load(const char *dir);
 /* 当前数据源 URL（环境变量覆盖后生效）；调用方不要 free */
@@ -29,7 +32,9 @@ int geo_resolve_dir(const char *cfg_dir, const char *env_dir, const char *home,
                     char *out, size_t outsz);
 /* 生效目录（薄胶水）：读 RYBA_GEO_DIR/HOME 环境 */
 int geo_active_dir(const char *cfg_dir, char *out, size_t outsz);
-/* 测试钩子：清表+清DNS缓存+loaded=0 */
+/* 测试钩子：清表+清DNS缓存+loaded=0+resolver=NULL */
 void geo_test_reset(void);
+/* 测试断言：当前注入的 resolver（NULL=系统 DNS）；供单测验证零网络 */
+void *geo_test_get_resolver(void);
 
 #endif

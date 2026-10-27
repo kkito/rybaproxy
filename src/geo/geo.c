@@ -363,6 +363,8 @@ static int g_loaded = 0;
 
 /* DNS 缓存前向声明（定义在文件后部，free/reset 需先用） */
 static void dns_cache_clear(void);
+/* 可注入 DNS 解析器（定义在后部 DNS 节；free/reset 需先用） */
+static geo_resolver_fn g_resolver;
 
 int geo_init(void) { return 0; }
 
@@ -371,6 +373,7 @@ void geo_free(void) {
     geo_tables_clear();
     dns_cache_clear();
     g_loaded = 0;
+    g_resolver = NULL;
     pthread_mutex_unlock(&g_lock);
 }
 
@@ -389,13 +392,21 @@ int geo_db_loaded(void) { return g_loaded; }
 const char *geo_ip_url(void) { return geo_env_or("RYBA_GEOIP_URL", kGeoIpURL); }
 const char *geo_site_url(void) { return geo_env_or("RYBA_GEOSITE_URL", kGeoSiteURL); }
 const char *geo_proxy(void) { const char *p = getenv("RYBA_GEO_PROXY"); return (p && *p) ? p : NULL; }
-/* 测试钩子：清表 + 清 DNS 缓存 + loaded=0（空库语义回归用） */
+/* 测试钩子：清表 + 清 DNS 缓存 + loaded=0 + resolver=NULL（空库语义回归用） */
 void geo_test_reset(void) {
     pthread_mutex_lock(&g_lock);
     geo_tables_clear();
     dns_cache_clear();
     g_loaded = 0;
+    g_resolver = NULL;
     pthread_mutex_unlock(&g_lock);
+}
+
+void *geo_test_get_resolver(void) {
+    pthread_mutex_lock(&g_lock);
+    void *r = (void *)g_resolver;
+    pthread_mutex_unlock(&g_lock);
+    return r;
 }
 size_t geo_ip_count(void) { return g_cidr_n; }
 size_t geo_site_count(void) { return g_suffix_n + g_exact_n + g_re_n; }
@@ -514,11 +525,41 @@ static void dns_cache_clear(void) {
     g_dns_pos = 0;
 }
 
+/* 可注入的 DNS 解析器：默认 NULL=走系统 getaddrinfo；测试注入 fake */
+/* （定义已前移到文件顶部，供 geo_free/reset 使用） */
+
+void geo_set_resolver(geo_resolver_fn fn) {
+    pthread_mutex_lock(&g_lock);
+    g_resolver = fn;
+    pthread_mutex_unlock(&g_lock);
+}
+
+/* 系统 DNS（唯一碰网络的地方；单测用注入绕过） */
+static int sys_resolve(const char *host, char *ip_out, size_t ipsz) {
+    struct addrinfo hints, *res = NULL;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM;
+    int rc = -1;
+    if (getaddrinfo(host, "80", &hints, &res) == 0 && res) {
+        void *ap = NULL;
+        if (res->ai_family == AF_INET) ap = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
+        else if (res->ai_family == AF_INET6) ap = &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
+        if (ap && inet_ntop(res->ai_family, ap, ip_out, (socklen_t)ipsz)) rc = 0;
+        freeaddrinfo(res);
+    }
+    return rc;
+}
+
 int geo_host_is_cn(const char *host) {
     if (!host || !*host) return -1;
     struct in_addr a4; struct in6_addr a6;
     if (inet_pton(AF_INET, host, &a4) == 1 || inet_pton(AF_INET6, host, &a6) == 1)
         return geo_ip_is_cn(host);
+    pthread_mutex_lock(&g_lock);
+    int loaded = g_loaded;
+    geo_resolver_fn resolver = g_resolver;
+    pthread_mutex_unlock(&g_lock);
+    if (!loaded) return -1; /* 空库未知：不许发起 DNS，直接返回 */
     time_t now = time(NULL);
     pthread_mutex_lock(&g_lock);
     for (int i = 0; i < GEO_DNS_CAP; i++) {
@@ -529,21 +570,12 @@ int geo_host_is_cn(const char *host) {
         }
     }
     pthread_mutex_unlock(&g_lock);
-    struct addrinfo hints, *res = NULL;
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM;
     char ipstr[64] = "";
     int cn = -1;
-    if (getaddrinfo(host, "80", &hints, &res) == 0 && res) {
-        void *ap = NULL;
-        if (res->ai_family == AF_INET) ap = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
-        else if (res->ai_family == AF_INET6) ap = &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
-        if (ap) {
-            inet_ntop(res->ai_family, ap, ipstr, sizeof ipstr);
-            cn = geo_ip_is_cn(ipstr);
-            if (cn < 0) cn = -1;
-        }
-        freeaddrinfo(res);
+    if ((resolver ? resolver(host, ipstr, sizeof ipstr)
+                  : sys_resolve(host, ipstr, sizeof ipstr)) == 0 && ipstr[0]) {
+        cn = geo_ip_is_cn(ipstr);
+        if (cn < 0) cn = -1;
     }
     if (cn >= 0 && ipstr[0]) {
         pthread_mutex_lock(&g_lock);

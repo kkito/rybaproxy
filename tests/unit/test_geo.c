@@ -74,9 +74,49 @@ static void test_invalid_input(void **s) {
     assert_int_equal(geo_site_is_cn(""), -1);
 }
 
+/* fake DNS 解析器：计数 + 可控返回，不碰真实网络 */
+static int g_resolve_calls = 0;
+static int fake_resolver(const char *host, char *ip_out, size_t ipsz) {
+    (void)host;
+    g_resolve_calls++;
+    snprintf(ip_out, ipsz, "%s", "1.2.3.9");
+    return 0;
+}
+
+/* 必失败的 resolver 替身：被调用即测试失败（fail_msg），证明零网络 */
+static int must_not_resolve(const char *host, char *ip_out, size_t ipsz) {
+    (void)host; (void)ip_out; (void)ipsz;
+    fail_msg("resolver must not be called (no network in tests)");
+    return -1;
+}
+
+static void test_host_no_dns_when_db_unloaded(void **s) {
+    (void)s;
+    /* 空库时 geo_host_is_cn 必须直接报未知，不许发起 DNS */
+    geo_set_resolver(must_not_resolve);
+    assert_int_equal(geo_db_loaded(), 0);
+    assert_int_equal(geo_host_is_cn("www.baidu.com"), -1);
+    geo_set_resolver(NULL);
+}
+
+static void test_host_uses_injected_resolver(void **s) {
+    (void)s;
+    /* 有库 + 注入 resolver：走 fake 结果，不碰真实 DNS */
+    write_dat("geoip.dat", kIpEntry, sizeof kIpEntry);
+    write_dat("geosite.dat", kSiteEntry, sizeof kSiteEntry);
+    assert_int_equal(geo_load(g_dir), 0);
+    geo_set_resolver(fake_resolver);
+    g_resolve_calls = 0;
+    assert_int_equal(geo_host_is_cn("anything.example"), 1); /* fake -> 1.2.3.9 -> CN */
+    assert_int_equal(g_resolve_calls, 1);
+    geo_set_resolver(NULL);
+}
+
 static void test_db_unloaded(void **s) {
     (void)s;
     /* 空库必须报未知(-1)，不许撒谎报非CN(0)：baidu 误判根因 */
+    /* 即使注入 resolver 也不许被调用：空库直接未知 */
+    geo_set_resolver(must_not_resolve);
     assert_int_equal(geo_db_loaded(), 0);
     assert_int_equal(geo_ip_is_cn("8.8.8.8"), -1);
     assert_int_equal(geo_ip_is_cn("110.242.69.21"), -1);
@@ -84,6 +124,7 @@ static void test_db_unloaded(void **s) {
     assert_int_equal(geo_host_is_cn("www.baidu.com"), -1);
     /* 私网不依赖 dat，仍判 CN */
     assert_int_equal(geo_ip_is_cn("192.168.1.1"), 1);
+    geo_set_resolver(NULL);
 }
 
 static void test_load_wire_dat(void **s) {
@@ -101,8 +142,10 @@ static void test_load_wire_dat(void **s) {
     assert_int_equal(geo_site_is_cn("notexample.cn"), 0);
     assert_int_equal(geo_site_is_cn("example.com"), 0);
     /* IP 字面量走 geo_host 直查，不碰 DNS */
+    geo_set_resolver(must_not_resolve);
     assert_int_equal(geo_host_is_cn("1.2.3.9"), 1);
     assert_int_equal(geo_host_is_cn("9.9.9.9"), 0);
+    geo_set_resolver(NULL);
 }
 
 static void test_load_missing_dir(void **s) {
@@ -156,6 +199,8 @@ int main(void) {
         cmocka_unit_test_setup_teardown(test_invalid_input, setup, teardown),
         cmocka_unit_test_setup_teardown(test_db_unloaded, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_wire_dat, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_host_no_dns_when_db_unloaded, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_host_uses_injected_resolver, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_missing_dir, setup, teardown),
         cmocka_unit_test(test_resolve_dir_prefers_cfg),
         cmocka_unit_test(test_resolve_dir_env_then_home_default),
