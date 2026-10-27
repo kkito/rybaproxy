@@ -17,5 +17,6 @@ int db_stats_daily(int days, char *buf, size_t bufsz);
 int db_stats_top(const char *by, int limit, long long from_ms, long long to_ms, char *buf, size_t bufsz);
 int db_settings_get(char *buf, size_t bufsz);
 int db_settings_set(const char *key, const char *value);
+int db_exec_raw(const char *sql);
 
 #endif

@@ -452,6 +452,14 @@ int db_settings_set(const char *key, const char *value) {
     return (rc == SQLITE_DONE) ? 0 : -1;
 }
 
+int db_exec_raw(const char *sql) {
+    if (!g_db || !sql) return -1;
+    char *err = NULL;
+    int rc = sqlite3_exec(g_db, sql, NULL, NULL, &err);
+    if (err) sqlite3_free(err);
+    return (rc == SQLITE_OK) ? 0 : -1;
+}
+
 int db_get_recent_sessions(int limit, char *buf, size_t bufsz) {
     if (!buf || bufsz == 0) return -1;
     if (limit <= 0) limit = 100;
