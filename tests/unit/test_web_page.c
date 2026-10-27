@@ -23,10 +23,26 @@ static void test_page_has_hooks(void **state) {
     assert_true(strstr(WEB_PAGE_HTML, "heatmap") != NULL);
 }
 
+static void test_page_geo_hooks(void **state) {
+    (void)state;
+    /* geo 条件下拉 + 出口 select + 管理卡 + 检测页调用 */
+    assert_true(strstr(WEB_PAGE_HTML, "name=\"geo_ip\"") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "name=\"geo_site\"") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "name=\"upstream_id\"") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "/api/geo/status") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "/api/geo/download") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "/api/geo/check") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "geoip:cn") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "geosite:cn") != NULL);
+    /* 旧 number 手填框已移除，出口是下拉 */
+    assert_true(strstr(WEB_PAGE_HTML, "name=\"upstream_id\" type=\"number\"") == NULL);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_page_uses_real_apis),
         cmocka_unit_test(test_page_has_hooks),
+        cmocka_unit_test(test_page_geo_hooks),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

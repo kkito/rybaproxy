@@ -171,7 +171,7 @@ static void parse_geosite_entry(const unsigned char *p, const unsigned char *end
                 else if (dtype == 3) regex_push((const char *)dval, (size_t)dlen);
                 /* dtype 2=DomainSuffix 等价 suffix；未知类型忽略 */
             }
-            p += 0; /* 已消费 */
+            p = dend; /* 消费整个 domain 子消息 */
         } else if (skip_field(&p, end, (unsigned)tag) != 0) return;
         (void)fp;
     }
@@ -225,7 +225,17 @@ static int parse_dat(const unsigned char *buf, size_t len, int is_ip) {
                 memcpy(cc, q, ccl); cc[ccl] = '\0'; q += vl;
             } else if (skip_field(&q, eend, (unsigned)et) != 0) break;
         }
-        if (strcasecmp(cc, "CN") == 0) {
+        /* geosite 的 CN 语义：纯 CN 分类 + 名字含 -CN 后缀且不以 !CN 结尾的分类；geosite:cn 的反选逻辑在查询侧用本表 */
+    int want = 0;
+    if (is_ip) want = (strcasecmp(cc, "CN") == 0);
+    else {
+        if (strcasecmp(cc, "CN") == 0) want = 1;
+        else {
+            size_t cl = strlen(cc);
+            if (cl > 3 && strcasecmp(cc + cl - 3, "-CN") == 0) want = 1;
+        }
+    }
+    if (want) {
             if (is_ip) parse_geoip_entry(ep, eend);
             else parse_geosite_entry(ep, eend);
         }
@@ -237,8 +247,8 @@ static int parse_dat(const unsigned char *buf, size_t len, int is_ip) {
 }
 
 /* 数据源：开源社区维护的 GeoIP / Geosite 数据文件（换源只改这两行） */
-static const char *kGeoIpURL = "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/geoip.dat";
-static const char *kGeoSiteURL = "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/geosite.dat";
+static const char *kGeoIpURL = "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat";
+static const char *kGeoSiteURL = "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat";
 
 int geo_download(const char *dir, char *err, size_t errsz) {
     if (err && errsz) err[0] = '\0';
