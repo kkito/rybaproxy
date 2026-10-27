@@ -44,6 +44,16 @@ int router_remove_rule(router_t *r, int id) {
     return -1;
 }
 
+/* geo 条件匹配：cn/-1(未知)/其它。未知一律不匹配（空库/非法值都不许分流，走默认）。
+ * 纯函数：把两处重复的 if 链收敛到一处。 */
+static int geo_cond_matches(const char *cond, int cn) {
+    if (!cond || !cond[0]) return 1; /* 无条件恒成立 */
+    if (cn < 0) return 0;
+    if (strcmp(cond, "cn") == 0) return cn == 1;
+    if (strcmp(cond, "!cn") == 0) return cn != 1;
+    return 0; /* 非法值：不匹配 */
+}
+
 static int rule_matches(const rule_t *rule, const char *host, int port, protocol_t proto, const char *client_ip) {
     if (!rule->enabled) return 0;
     if (rule->port != 0 && rule->port != port) return 0;
@@ -55,20 +65,8 @@ static int rule_matches(const rule_t *rule, const char *host, int port, protocol
         if (!match_cidr(rule->ip_cidr, client_ip ? client_ip : "")) return 0;
         /* if domain rule also has cidr, require both; ip-only rules should leave domain empty */
     }
-    if (rule->geo_ip[0]) {
-        int cn = geo_host_is_cn(host);
-        if (cn < 0) return 0; /* 空库未知：不许匹配 cn/!cn 任一，一律走默认 */
-        if (strcmp(rule->geo_ip, "cn") == 0 && cn != 1) return 0;
-        else if (strcmp(rule->geo_ip, "!cn") == 0 && cn == 1) return 0;
-        else if (rule->geo_ip[0] && strcmp(rule->geo_ip, "cn") != 0 && strcmp(rule->geo_ip, "!cn") != 0) return 0;
-    }
-    if (rule->geo_site[0]) {
-        int cn = geo_site_is_cn(host);
-        if (cn < 0) return 0; /* 空库未知：不许匹配 cn/!cn 任一，一律走默认 */
-        if (strcmp(rule->geo_site, "cn") == 0 && cn != 1) return 0;
-        else if (strcmp(rule->geo_site, "!cn") == 0 && cn == 1) return 0;
-        else if (rule->geo_site[0] && strcmp(rule->geo_site, "cn") != 0 && strcmp(rule->geo_site, "!cn") != 0) return 0;
-    }
+    if (!geo_cond_matches(rule->geo_ip, geo_host_is_cn(host))) return 0;
+    if (!geo_cond_matches(rule->geo_site, geo_site_is_cn(host))) return 0;
     return 1;
 }
 

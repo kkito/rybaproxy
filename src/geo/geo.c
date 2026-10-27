@@ -418,6 +418,32 @@ static int is_private_ip(const unsigned char key[16], int is6) {
     return 0;
 }
 
+/* ---------- 查表（纯匹配，要求调用方已持 g_lock；无锁/无IO，可单测） ---------- */
+static int cidr_table_hit(const unsigned char key[16]) {
+    for (size_t i = 0; i < g_cidr_n; i++)
+        if (match_cidr6(key, &g_cidrs[i])) return 1;
+    return 0;
+}
+
+static int site_table_hit(const char *low) {
+    size_t L = strlen(low);
+    for (size_t i = 0; i < g_exact_n; i++)
+        if (strcmp(low, g_exact[i]) == 0) return 1;
+    char rev[256];
+    for (size_t i = 0; i < L; i++) rev[i] = low[L - 1 - i];
+    rev[L] = '\0';
+    for (size_t i = 0; i < g_suffix_n; i++) {
+        size_t sl = strlen(g_suffix[i].rev);
+        if (L >= sl && memcmp(rev, g_suffix[i].rev, sl) == 0) {
+            /* 须是完整 label 边界：example.cn 命中 a.example.cn；不命中 notexample.cn */
+            if (L == sl || rev[sl] == '.') return 1;
+        }
+    }
+    for (size_t i = 0; i < g_re_n; i++)
+        if (regexec(&g_res[i], low, 0, NULL, 0) == 0) return 1;
+    return 0;
+}
+
 int geo_ip_is_cn(const char *ip) {
     if (!ip || !*ip) return -1;
     unsigned char raw[16]; int is6 = 0;
@@ -427,51 +453,36 @@ int geo_ip_is_cn(const char *ip) {
     else return -1;
     unsigned char key[16];
     norm_key(raw, is6, key);
-    if (is_private_ip(is6 ? raw : raw, is6)) return 1;
+    if (is_private_ip(raw, is6)) return 1; /* 私网不依赖 dat */
     pthread_mutex_lock(&g_lock);
-    if (!g_loaded) { pthread_mutex_unlock(&g_lock); return -1; } /* 空库报未知，不许报非CN */
     int hit = 0;
-    for (size_t i = 0; i < g_cidr_n; i++) {
-        if (match_cidr6(key, &g_cidrs[i])) { hit = 1; break; }
-    }
+    if (!g_loaded) hit = -1; /* 空库报未知，不许报非CN */
+    else hit = cidr_table_hit(key);
     pthread_mutex_unlock(&g_lock);
-    return hit ? 1 : 0;
+    return hit < 0 ? -1 : (hit ? 1 : 0);
 }
 
 int geo_site_is_cn(const char *host) {
     if (!host || !*host) return -1;
+    /* 先做纯归一化（无锁）：IP 字面量 / 大小写 / 尾点 */
     struct in_addr a4; struct in6_addr a6;
     int is_lit = (inet_pton(AF_INET, host, &a4) == 1 || inet_pton(AF_INET6, host, &a6) == 1);
-    pthread_mutex_lock(&g_lock);
-    if (!g_loaded) { pthread_mutex_unlock(&g_lock); return -1; } /* 空库报未知，不许报非CN */
-    if (is_lit) { pthread_mutex_unlock(&g_lock); return 0; } /* IP 字面量无域名可查 */
-    int hit = 0;
     char low[256];
     size_t L = strlen(host);
-    if (L >= sizeof low) { pthread_mutex_unlock(&g_lock); return -1; }
-    for (size_t i = 0; i <= L; i++) low[i] = (char)tolower((unsigned char)host[i]);
-    while (L && low[L - 1] == '.') low[--L] = '\0';
-    if (!L) { pthread_mutex_unlock(&g_lock); return -1; }
-    for (size_t i = 0; i < g_exact_n && !hit; i++)
-        if (strcmp(low, g_exact[i]) == 0) hit = 1;
-    if (!hit) {
-        char rev[256];
-        for (size_t i = 0; i < L; i++) rev[i] = low[L - 1 - i];
-        rev[L] = '\0';
-        for (size_t i = 0; i < g_suffix_n && !hit; i++) {
-            size_t sl = strlen(g_suffix[i].rev);
-            if (L >= sl && memcmp(rev, g_suffix[i].rev, sl) == 0) {
-                /* 须是完整 label 边界：example.cn 命中 a.example.cn；不命中 notexample.cn */
-                if (L == sl || rev[sl] == '.') hit = 1;
-            }
-        }
+    if (is_lit) low[0] = '\0';
+    else {
+        if (L >= sizeof low) return -1;
+        for (size_t i = 0; i <= L; i++) low[i] = (char)tolower((unsigned char)host[i]);
+        while (L && low[L - 1] == '.') low[--L] = '\0';
+        if (!L) return -1;
     }
-    if (!hit) {
-        for (size_t i = 0; i < g_re_n && !hit; i++)
-            if (regexec(&g_res[i], low, 0, NULL, 0) == 0) hit = 1;
-    }
+    pthread_mutex_lock(&g_lock);
+    int r;
+    if (!g_loaded) r = -1; /* 空库报未知，不许报非CN */
+    else if (is_lit) r = 0; /* IP 字面量无域名可查 */
+    else r = site_table_hit(low) ? 1 : 0;
     pthread_mutex_unlock(&g_lock);
-    return hit ? 1 : 0;
+    return r;
 }
 
 /* ---------- DNS + 缓存 ---------- */
