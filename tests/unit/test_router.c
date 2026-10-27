@@ -1,5 +1,6 @@
 #include <cmocka.h>
 #include "rybaproxy/router.h"
+#include "rybaproxy/db.h"
 #include "rybaproxy/geo.h"
 #include <stdio.h>
 #include <string.h>
@@ -82,12 +83,21 @@ static int geo_setup(void **s) {
     h[1] = (unsigned char)sizeof kSiteEntry;
     fwrite(h, 1, 2, f); fwrite(kSiteEntry, 1, sizeof kSiteEntry, f); fclose(f);
     geo_init();
-    if (geo_load(g_dir) != 0) return -1;
+    /* geo 查询走 sqlite：先开临时库（不碰家目录） */
+    char dbpath[256];
+    snprintf(dbpath, sizeof dbpath, "/tmp/ryba_rgeo_%d.db", (int)getpid());
+    remove(dbpath);
+    if (db_init(dbpath) != 0) return -1;
+    if (geo_load(g_dir) != 0) { db_stop(); return -1; }
     return 0;
 }
 static int geo_teardown(void **s) {
     (void)s;
     geo_free();
+    db_stop();
+    char dbpath[256];
+    snprintf(dbpath, sizeof dbpath, "/tmp/ryba_rgeo_%d.db", (int)getpid());
+    remove(dbpath);
     /* resolver 必须随 geo_free 复位为 NULL（否则跨用例残留 fake） */
     assert_null(geo_test_get_resolver());
     char cmd[256];

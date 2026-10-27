@@ -1,4 +1,5 @@
 #include "rybaproxy/geo.h"
+#include "rybaproxy/db.h"
 #include "rybaproxy/paths.h"
 
 #include <arpa/inet.h>
@@ -6,6 +7,7 @@
 #include <netdb.h>
 #include <pthread.h>
 #include <regex.h>
+#include <sqlite3.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,57 +31,86 @@ static int read_varint(const unsigned char **pp, const unsigned char *end, uint6
 }
 
 /* ---------- IP 表 ---------- */
-typedef struct { unsigned char addr[16]; int bits; int is6; } cidr_t;
-static cidr_t *g_cidrs = NULL;
-static size_t g_cidr_n = 0, g_cidr_cap = 0;
+/* sqlite 落盘查询（调用方已持 g_lock）。v4: start/end 存 uint32；v6: 128 位拆四列。 */
 static void geo_tables_clear(void);
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
-static void cidr_push(const unsigned char *ip, size_t iplen, int prefix) {
-    if (g_cidr_n == g_cidr_cap) {
-        size_t ncap = g_cidr_cap ? g_cidr_cap * 2 : 256;
-        cidr_t *nr = realloc(g_cidrs, ncap * sizeof *nr);
-        if (!nr) return;
-        g_cidrs = nr; g_cidr_cap = ncap;
+static int sql_hit_ip4(uint32_t addr) {
+    sqlite3 *h = db_handle();
+    if (!h) return -1;
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(h, "SELECT 1 FROM geo_ip WHERE start<=?1 AND ?1<=end LIMIT 1",
+                           -1, &st, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_int64(st, 1, (sqlite3_int64)addr);
+    int hit = (sqlite3_step(st) == SQLITE_ROW) ? 1 : 0;
+    sqlite3_finalize(st);
+    return hit;
+}
+
+static int sql_hit_ip6(const unsigned char key[16]) {
+    sqlite3 *h = db_handle();
+    if (!h) return -1;
+    uint64_t s_hi = 0, s_lo = 0;
+    for (int i = 0; i < 8; i++) { s_hi = (s_hi << 8) | key[i]; s_lo = (s_lo << 8) | key[8 + i]; }
+    sqlite3_stmt *st = NULL;
+    const char *sql = "SELECT 1 FROM geo_ip6 WHERE (s_hi< ?1 OR (s_hi==?1 AND s_lo<=?2))"
+                      " AND (e_hi> ?1 OR (e_hi==?1 AND e_lo>=?2)) LIMIT 1";
+    if (sqlite3_prepare_v2(h, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_int64(st, 1, (sqlite3_int64)s_hi);
+    sqlite3_bind_int64(st, 2, (sqlite3_int64)s_lo);
+    int hit = (sqlite3_step(st) == SQLITE_ROW) ? 1 : 0;
+    sqlite3_finalize(st);
+    return hit;
+}
+
+static int sql_hit_exact(const char *low) {
+    sqlite3 *h = db_handle();
+    if (!h) return -1;
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(h, "SELECT 1 FROM geo_site_exact WHERE host=?1 LIMIT 1",
+                           -1, &st, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_text(st, 1, low, -1, SQLITE_STATIC);
+    int hit = (sqlite3_step(st) == SQLITE_ROW) ? 1 : 0;
+    sqlite3_finalize(st);
+    return hit;
+}
+
+/* suffix 前缀查：rev<=low 倒序取 8 条候选，逐个做 label 边界校验 */
+static int sql_hit_suffix(const char *low) {
+    sqlite3 *h = db_handle();
+    if (!h) return -1;
+    size_t L = strlen(low);
+    char rev[256];
+    if (L >= sizeof rev) return -1;
+    for (size_t i = 0; i < L; i++) rev[i] = low[L - 1 - i];
+    rev[L] = '\0';
+    sqlite3_stmt *st = NULL;
+    const char *sql = "SELECT rev FROM geo_site_suffix WHERE rev<=?1 ORDER BY rev DESC LIMIT 8";
+    if (sqlite3_prepare_v2(h, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    sqlite3_bind_text(st, 1, rev, -1, SQLITE_STATIC);
+    int hit = 0;
+    while (sqlite3_step(st) == SQLITE_ROW) {
+        const unsigned char *r = sqlite3_column_text(st, 0);
+        if (!r) continue;
+        size_t sl = strlen((const char *)r);
+        if (L >= sl && memcmp(rev, r, sl) == 0 && (L == sl || rev[sl] == '.')) { hit = 1; break; }
     }
-    cidr_t *c = &g_cidrs[g_cidr_n++];
-    memset(c->addr, 0, 16);
-    if (iplen == 4) { c->is6 = 0; memcpy(c->addr, ip, 4); c->bits = prefix > 32 ? 32 : prefix; }
-    else if (iplen == 16) { c->is6 = 1; memcpy(c->addr, ip, 16); c->bits = prefix > 128 ? 128 : prefix; }
-    else g_cidr_n--;
+    sqlite3_finalize(st);
+    return hit;
 }
 
-static int cidr_cmp(const void *a, const void *b) {
-    const cidr_t *x = a, *y = b;
-    if (x->is6 != y->is6) return x->is6 - y->is6;
-    int r = memcmp(x->addr, x->is6 ? x->addr : x->addr, x->is6 ? 16 : 4);
-    (void)y;
-    return r;
-}
-
-/* v6 统一比较：v4 视为 ::ffff:a.b.c.d */
-static void norm_key(const unsigned char *raw, int is6, unsigned char out[16]) {
-    if (is6) memcpy(out, raw, 16);
-    else { memset(out, 0, 16); out[10] = 0xFF; out[11] = 0xFF; memcpy(out + 12, raw, 4); }
-}
-
-static int match_cidr6(const unsigned char key[16], const cidr_t *c) {
-    unsigned char net[16];
-    norm_key(c->addr, c->is6, net);
-    int bits = c->bits + (c->is6 ? 0 : 96);
-    for (int i = 0; i < bits; i++)
-        if (((key[i / 8] >> (7 - i % 8)) & 1) != ((net[i / 8] >> (7 - i % 8)) & 1)) return 0;
-    return 1;
-}
-
-/* ---------- 域名表 ---------- */
-typedef struct { char *rev; } suffix_t; /* 反转小写后缀 */
-static suffix_t *g_suffix = NULL;
-static size_t g_suffix_n = 0, g_suffix_cap = 0;
-static char **g_exact = NULL;
-static size_t g_exact_n = 0, g_exact_cap = 0;
+/* ---------- 域名表：regex 留内存（几十条），exact/suffix 进 sqlite ---------- */
 static regex_t *g_res = NULL;
 static size_t g_re_n = 0, g_re_cap = 0;
+
+/* 导入回调上下文：批量 INSERT 的 prepared statement */
+typedef struct {
+    sqlite3_stmt *ip4;
+    sqlite3_stmt *ip6;
+    sqlite3_stmt *exact;
+    sqlite3_stmt *suffix;
+    long n_since_commit;
+} import_ctx_t;
 
 static char *strlowdup(const char *s, size_t n) {
     char *o = malloc(n + 1);
@@ -89,34 +120,67 @@ static char *strlowdup(const char *s, size_t n) {
     return o;
 }
 
-static void suffix_push(const char *s, size_t n) {
+/* 每 500 条 COMMIT 一次防 WAL 膨胀 */
+static void import_maybe_commit(sqlite3 *h, import_ctx_t *cx) {
+    if (++cx->n_since_commit < 500) return;
+    cx->n_since_commit = 0;
+    sqlite3_exec(h, "COMMIT;BEGIN IMMEDIATE;", NULL, NULL, NULL);
+}
+
+static void suffix_insert(sqlite3 *h, import_ctx_t *cx, const char *s, size_t n) {
     char *low = strlowdup(s, n);
     if (!low) return;
     size_t L = strlen(low);
-    char *rev = malloc(L + 1);
-    if (!rev) { free(low); return; }
+    char rev[256];
+    if (L >= sizeof rev) { free(low); return; }
     for (size_t i = 0; i < L; i++) rev[i] = low[L - 1 - i];
     rev[L] = '\0';
     free(low);
-    if (g_suffix_n == g_suffix_cap) {
-        size_t ncap = g_suffix_cap ? g_suffix_cap * 2 : 256;
-        suffix_t *nr = realloc(g_suffix, ncap * sizeof *nr);
-        if (!nr) { free(rev); return; }
-        g_suffix = nr; g_suffix_cap = ncap;
-    }
-    g_suffix[g_suffix_n++].rev = rev;
+    sqlite3_bind_text(cx->suffix, 1, rev, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(cx->suffix, 2, "CN", -1, SQLITE_STATIC);
+    if (sqlite3_step(cx->suffix) == SQLITE_DONE) import_maybe_commit(h, cx);
+    sqlite3_reset(cx->suffix);
 }
 
-static void exact_push(const char *s, size_t n) {
+static void exact_insert(import_ctx_t *cx, const char *s, size_t n) {
     char *low = strlowdup(s, n);
     if (!low) return;
-    if (g_exact_n == g_exact_cap) {
-        size_t ncap = g_exact_cap ? g_exact_cap * 2 : 256;
-        char **nr = realloc(g_exact, ncap * sizeof *nr);
-        if (!nr) { free(low); return; }
-        g_exact = nr; g_exact_cap = ncap;
+    sqlite3_bind_text(cx->exact, 1, low, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(cx->exact, 2, "CN", -1, SQLITE_STATIC);
+    sqlite3_step(cx->exact);
+    sqlite3_reset(cx->exact);
+    free(low);
+}
+
+/* cidr 转区间存 sqlite：v4→uint32 start/end；v6→128 位拆四列 */
+static void cidr_insert(sqlite3 *h, import_ctx_t *cx,
+                        const unsigned char *ip, size_t iplen, int prefix) {
+    if (iplen == 4) {
+        if (prefix < 0 || prefix > 32) return;
+        uint32_t a;
+        memcpy(&a, ip, 4); a = ntohl(a);
+        uint32_t mask = prefix == 0 ? 0 : (~0u << (32 - prefix));
+        uint32_t s = a & mask, e = s | ~mask;
+        sqlite3_bind_int64(cx->ip4, 1, (sqlite3_int64)s);
+        sqlite3_bind_int64(cx->ip4, 2, (sqlite3_int64)e);
+        sqlite3_bind_text(cx->ip4, 3, "CN", -1, SQLITE_STATIC);
+        if (sqlite3_step(cx->ip4) == SQLITE_DONE) import_maybe_commit(h, cx);
+        sqlite3_reset(cx->ip4);
+    } else if (iplen == 16) {
+        if (prefix < 0 || prefix > 128) return;
+        uint64_t hi = 0, lo = 0;
+        for (int i = 0; i < 8; i++) { hi = (hi << 8) | ip[i]; lo = (lo << 8) | ip[8 + i]; }
+        unsigned __int128 full = ((unsigned __int128)hi << 64) | lo;
+        unsigned __int128 mask = prefix == 0 ? 0 : (~(unsigned __int128)0 << (128 - prefix));
+        unsigned __int128 s = full & mask, e = s | ~mask;
+        sqlite3_bind_int64(cx->ip6, 1, (sqlite3_int64)(uint64_t)(s >> 64));
+        sqlite3_bind_int64(cx->ip6, 2, (sqlite3_int64)(uint64_t)s);
+        sqlite3_bind_int64(cx->ip6, 3, (sqlite3_int64)(uint64_t)(e >> 64));
+        sqlite3_bind_int64(cx->ip6, 4, (sqlite3_int64)(uint64_t)e);
+        sqlite3_bind_text(cx->ip6, 5, "CN", -1, SQLITE_STATIC);
+        if (sqlite3_step(cx->ip6) == SQLITE_DONE) import_maybe_commit(h, cx);
+        sqlite3_reset(cx->ip6);
     }
-    g_exact[g_exact_n++] = low;
 }
 
 static void regex_push(const char *s, size_t n) {
@@ -146,8 +210,10 @@ static int skip_field(const unsigned char **pp, const unsigned char *end, unsign
     return -1;
 }
 
-/* 从 GeoSite entry payload 提取 domain 条目 */
-static void parse_geosite_entry(const unsigned char *p, const unsigned char *end) {
+/* 从 GeoSite entry payload 按 domain 条目回调（type,val,len） */
+static void parse_geosite_entry(const unsigned char *p, const unsigned char *end,
+                                void (*emit)(int type, const char *val, size_t len, void *ud),
+                                void *ud) {
     while (p < end) {
         const unsigned char *fp = p;
         uint64_t tag;
@@ -168,10 +234,7 @@ static void parse_geosite_entry(const unsigned char *p, const unsigned char *end
                 } else if (skip_field(&dp, dend, (unsigned)dtag) != 0) return;
             }
             if (dtype >= 0 && dval) {
-                if (dtype == 0) exact_push((const char *)dval, (size_t)dlen);
-                else if (dtype == 1 || dtype == 2) suffix_push((const char *)dval, (size_t)dlen);
-                else if (dtype == 3) regex_push((const char *)dval, (size_t)dlen);
-                /* dtype 2=DomainSuffix 等价 suffix；未知类型忽略 */
+                emit(dtype, (const char *)dval, (size_t)dlen, ud);
             }
             p = dend; /* 消费整个 domain 子消息 */
         } else if (skip_field(&p, end, (unsigned)tag) != 0) return;
@@ -179,8 +242,10 @@ static void parse_geosite_entry(const unsigned char *p, const unsigned char *end
     }
 }
 
-/* 从 GeoIP entry payload 提取 cidr 条目 */
-static void parse_geoip_entry(const unsigned char *p, const unsigned char *end) {
+/* 从 GeoIP entry payload 按 cidr 条目回调（ip,len,prefix） */
+static void parse_geoip_entry(const unsigned char *p, const unsigned char *end,
+                              void (*emit)(const unsigned char *ip, size_t len, int prefix, void *ud),
+                              void *ud) {
     while (p < end) {
         uint64_t tag; if (read_varint(&p, end, &tag) != 0) return;
         int field = (int)(tag >> 3), wire = (int)(tag & 7);
@@ -198,14 +263,17 @@ static void parse_geoip_entry(const unsigned char *p, const unsigned char *end) 
                 } else if (cf == 2 && cw == 0) { uint64_t v; if (read_varint(&cp, cend, &v) != 0) return; prefix = (int)v; }
                 else if (skip_field(&cp, cend, (unsigned)ctag) != 0) return;
             }
-            if (ipb && (iplen == 4 || iplen == 16) && prefix >= 0) cidr_push(ipb, (size_t)iplen, prefix);
+            if (ipb && (iplen == 4 || iplen == 16) && prefix >= 0) emit(ipb, (size_t)iplen, prefix, ud);
             p += L;
         } else if (skip_field(&p, end, (unsigned)tag) != 0) return;
     }
 }
 
 /* 顶层：GeoIPList{entry=1}/GeoSiteList{entry=1}，只收 country_code=="CN"(大小写不敏感) 的 entry */
-static int parse_dat(const unsigned char *buf, size_t len, int is_ip) {
+static int parse_dat(const unsigned char *buf, size_t len, int is_ip,
+                     void (*emit_ip)(const unsigned char *, size_t, int, void *),
+                     void (*emit_site)(int, const char *, size_t, void *),
+                     void *ud) {
     const unsigned char *p = buf, *end = buf + len;
     while (p < end) {
         uint64_t tag; if (read_varint(&p, end, &tag) != 0) return -1;
@@ -238,13 +306,11 @@ static int parse_dat(const unsigned char *buf, size_t len, int is_ip) {
         }
     }
     if (want) {
-            if (is_ip) parse_geoip_entry(ep, eend);
-            else parse_geosite_entry(ep, eend);
+            if (is_ip) parse_geoip_entry(ep, eend, emit_ip, ud);
+            else parse_geosite_entry(ep, eend, emit_site, ud);
         }
         p += L;
     }
-    /* 排序供二分/前缀比较 */
-    if (is_ip && g_cidr_n) qsort(g_cidrs, g_cidr_n, sizeof *g_cidrs, cidr_cmp);
     return 0;
 }
 
@@ -378,13 +444,19 @@ void geo_free(void) {
 }
 
 static void geo_tables_clear(void) {
-    free(g_cidrs); g_cidrs = NULL; g_cidr_n = g_cidr_cap = 0;
-    for (size_t i = 0; i < g_suffix_n; i++) free(g_suffix[i].rev);
-    free(g_suffix); g_suffix = NULL; g_suffix_n = g_suffix_cap = 0;
-    for (size_t i = 0; i < g_exact_n; i++) free(g_exact[i]);
-    free(g_exact); g_exact = NULL; g_exact_n = g_exact_cap = 0;
     for (size_t i = 0; i < g_re_n; i++) regfree(&g_res[i]);
     free(g_res); g_res = NULL; g_re_n = g_re_cap = 0;
+}
+
+static int sql_count(const char *sql) {
+    sqlite3 *h = db_handle();
+    if (!h) return -1;
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(h, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    int n = -1;
+    if (sqlite3_step(st) == SQLITE_ROW) n = sqlite3_column_int(st, 0);
+    sqlite3_finalize(st);
+    return n;
 }
 
 int geo_db_loaded(void) { return g_loaded; }
@@ -408,25 +480,68 @@ void *geo_test_get_resolver(void) {
     pthread_mutex_unlock(&g_lock);
     return r;
 }
-size_t geo_ip_count(void) { return g_cidr_n; }
-size_t geo_site_count(void) { return g_suffix_n + g_exact_n + g_re_n; }
+size_t geo_ip_count(void) { int n = sql_count("SELECT COUNT(*) FROM geo_ip")
+    + sql_count("SELECT COUNT(*) FROM geo_ip6"); return n < 0 ? 0 : (size_t)n; }
+size_t geo_site_count(void) { int n = sql_count("SELECT COUNT(*) FROM geo_site_exact")
+    + sql_count("SELECT COUNT(*) FROM geo_site_suffix") + (int)g_re_n; return n < 0 ? 0 : (size_t)n; }
+
+static void emit_site_sql(int type, const char *val, size_t len, void *ud) {
+    import_ctx_t *cx = ud;
+    if (type == 0) exact_insert(cx, val, len);
+    else if (type == 1 || type == 2) suffix_insert(db_handle(), cx, val, len);
+    else if (type == 3) regex_push(val, len);
+}
+
+static void emit_ip_sql(const unsigned char *ip, size_t len, int prefix, void *ud) {
+    import_ctx_t *cx = ud;
+    cidr_insert(db_handle(), cx, ip, len, prefix);
+}
 
 int geo_load(const char *dir) {
     if (!dir || !*dir) return -1;
     char p1[1024], p2[1024];
     snprintf(p1, sizeof p1, "%s/geoip.dat", dir);
     snprintf(p2, sizeof p2, "%s/geosite.dat", dir);
-    int ok = 0;
+    size_t n = 0;
+    unsigned char *b1 = read_file(p1, &n);
+    size_t n1 = b1 ? n : 0;
+    unsigned char *b2 = read_file(p2, &n);
+    size_t n2 = b2 ? n : 0;
+    if (!b1 && !b2) return -1;
+    sqlite3 *h = db_handle();
+    if (!h) { free(b1); free(b2); return -1; }
+    int rc = -1;
     pthread_mutex_lock(&g_lock);
     geo_tables_clear();
-    size_t n = 0;
-    unsigned char *b = read_file(p1, &n);
-    if (b) { if (parse_dat(b, n, 1) == 0) ok |= 1; free(b); }
-    b = read_file(p2, &n);
-    if (b) { if (parse_dat(b, n, 0) == 0) ok |= 2; free(b); }
-    if (ok) g_loaded = 1;
+    if (sqlite3_exec(h, "BEGIN IMMEDIATE;", NULL, NULL, NULL) != SQLITE_OK) goto out;
+    sqlite3_exec(h, "DELETE FROM geo_ip;", NULL, NULL, NULL);
+    sqlite3_exec(h, "DELETE FROM geo_ip6;", NULL, NULL, NULL);
+    sqlite3_exec(h, "DELETE FROM geo_site_exact;", NULL, NULL, NULL);
+    sqlite3_exec(h, "DELETE FROM geo_site_suffix;", NULL, NULL, NULL);
+    import_ctx_t cx;
+    memset(&cx, 0, sizeof cx);
+    sqlite3_prepare_v2(h, "INSERT INTO geo_ip(start,end,cc) VALUES(?1,?2,?3)", -1, &cx.ip4, NULL);
+    sqlite3_prepare_v2(h, "INSERT INTO geo_ip6(s_hi,s_lo,e_hi,e_lo,cc) VALUES(?1,?2,?3,?4,?5)", -1, &cx.ip6, NULL);
+    sqlite3_prepare_v2(h, "INSERT OR IGNORE INTO geo_site_exact(host,cc) VALUES(?1,?2)", -1, &cx.exact, NULL);
+    sqlite3_prepare_v2(h, "INSERT OR IGNORE INTO geo_site_suffix(rev,cc) VALUES(?1,?2)", -1, &cx.suffix, NULL);
+    if (b1) { if (parse_dat(b1, n1, 1, emit_ip_sql, emit_site_sql, &cx) != 0) goto fin; }
+    if (b2) { if (parse_dat(b2, n2, 0, emit_ip_sql, emit_site_sql, &cx) != 0) goto fin; }
+    sqlite3_finalize(cx.ip4); sqlite3_finalize(cx.ip6);
+    sqlite3_finalize(cx.exact); sqlite3_finalize(cx.suffix);
+    cx.ip4 = cx.ip6 = cx.exact = cx.suffix = NULL;
+    if (sqlite3_exec(h, "COMMIT;", NULL, NULL, NULL) != SQLITE_OK) { sqlite3_exec(h, "ROLLBACK;", NULL, NULL, NULL); goto out; }
+    g_loaded = 1;
+    rc = 0;
+fin:
+    if (cx.ip4) sqlite3_finalize(cx.ip4);
+    if (cx.ip6) sqlite3_finalize(cx.ip6);
+    if (cx.exact) sqlite3_finalize(cx.exact);
+    if (cx.suffix) sqlite3_finalize(cx.suffix);
+    if (rc != 0) sqlite3_exec(h, "ROLLBACK;", NULL, NULL, NULL);
+out:
     pthread_mutex_unlock(&g_lock);
-    return ok ? 0 : -1;
+    free(b1); free(b2);
+    return rc;
 }
 
 /* 私网视同 CN */
@@ -447,30 +562,21 @@ static int is_private_ip(const unsigned char key[16], int is6) {
     return 0;
 }
 
-/* ---------- 查表（纯匹配，要求调用方已持 g_lock；无锁/无IO，可单测） ---------- */
-static int cidr_table_hit(const unsigned char key[16]) {
-    for (size_t i = 0; i < g_cidr_n; i++)
-        if (match_cidr6(key, &g_cidrs[i])) return 1;
-    return 0;
+/* v4 映射：::ffff:a.b.c.d；v6 原样 */
+static void norm_key(const unsigned char *raw, int is6, unsigned char out[16]) {
+    if (is6) memcpy(out, raw, 16);
+    else { memset(out, 0, 16); out[10] = 0xFF; out[11] = 0xFF; memcpy(out + 12, raw, 4); }
 }
 
+/* ---------- 查表（调用方已持 g_lock；无锁/无IO，可单测） ---------- */
 static int site_table_hit(const char *low) {
-    size_t L = strlen(low);
-    for (size_t i = 0; i < g_exact_n; i++)
-        if (strcmp(low, g_exact[i]) == 0) return 1;
-    char rev[256];
-    for (size_t i = 0; i < L; i++) rev[i] = low[L - 1 - i];
-    rev[L] = '\0';
-    for (size_t i = 0; i < g_suffix_n; i++) {
-        size_t sl = strlen(g_suffix[i].rev);
-        if (L >= sl && memcmp(rev, g_suffix[i].rev, sl) == 0) {
-            /* 须是完整 label 边界：example.cn 命中 a.example.cn；不命中 notexample.cn */
-            if (L == sl || rev[sl] == '.') return 1;
-        }
-    }
+    int e = sql_hit_exact(low);
+    if (e != 0) return e; /* 1 命中，-1 降级走 regex */
+    int s = sql_hit_suffix(low);
+    if (s == 1) return 1;
     for (size_t i = 0; i < g_re_n; i++)
         if (regexec(&g_res[i], low, 0, NULL, 0) == 0) return 1;
-    return 0;
+    return s < 0 ? s : 0;
 }
 
 int geo_ip_is_cn(const char *ip) {
@@ -486,7 +592,8 @@ int geo_ip_is_cn(const char *ip) {
     pthread_mutex_lock(&g_lock);
     int hit = 0;
     if (!g_loaded) hit = -1; /* 空库报未知，不许报非CN */
-    else hit = cidr_table_hit(key);
+    else if (is6) hit = sql_hit_ip6(key);
+    else { uint32_t a; memcpy(&a, raw, 4); hit = sql_hit_ip4(ntohl(a)); }
     pthread_mutex_unlock(&g_lock);
     return hit < 0 ? -1 : (hit ? 1 : 0);
 }

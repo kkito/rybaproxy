@@ -32,6 +32,9 @@ int geo_resolve_dir(const char *cfg_dir, const char *env_dir, const char *home,
                     char *out, size_t outsz);
 /* 生效目录（薄胶水）：读 RYBA_GEO_DIR/HOME 环境 */
 int geo_active_dir(const char *cfg_dir, char *out, size_t outsz);
+/* LRU 大小：默认 512，0=关闭，直查 sqlite；上限 4096，返回生效值 */
+int geo_set_cache_size(int n);
+int geo_cache_size(void);
 /* 测试钩子：清表+清DNS缓存+loaded=0+resolver=NULL */
 void geo_test_reset(void);
 /* 测试断言：当前注入的 resolver（NULL=系统 DNS）；供单测验证零网络 */

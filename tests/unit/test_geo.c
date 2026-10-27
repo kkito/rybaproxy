@@ -4,6 +4,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "rybaproxy/geo.h"
+#include "rybaproxy/db.h"
 
 /* 真实 wire 格式迷你 dat（手写 protobuf 编码）：
  * GeoIPList{ entry{ country_code:"CN", cidr{ ip:\x01\x02\x03\x00, prefix:24 } } }
@@ -44,6 +45,11 @@ static int setup(void **s) {
     char cmd[256];
     snprintf(cmd, sizeof cmd, "rm -rf %s && mkdir -p %s", g_dir, g_dir);
     assert_int_equal(system(cmd), 0);
+    /* geo 查询走 sqlite：每个用例先开临时库（不碰家目录） */
+    char dbpath[256];
+    snprintf(dbpath, sizeof dbpath, "/tmp/ryba_geo_%d.db", (int)getpid());
+    remove(dbpath);
+    assert_int_equal(db_init(dbpath), 0);
     geo_init();
     return 0;
 }
@@ -51,6 +57,10 @@ static int setup(void **s) {
 static int teardown(void **s) {
     (void)s;
     geo_free();
+    db_stop();
+    char dbpath[256];
+    snprintf(dbpath, sizeof dbpath, "/tmp/ryba_geo_%d.db", (int)getpid());
+    remove(dbpath);
     char cmd[256];
     snprintf(cmd, sizeof cmd, "rm -rf %s", g_dir);
     (void)system(cmd);
@@ -193,6 +203,22 @@ static void test_reload_replaces_without_dup(void **s) {
     assert_int_equal(geo_site_count(), site1);
 }
 
+/* RED(Task3): 导入后删掉 dat，查询仍命中 → 证明走 sqlite 不依赖 dat 文件 */
+static void test_import_then_query_from_sqlite(void **s) {
+    (void)s;
+    write_dat("geoip.dat", kIpEntry, sizeof kIpEntry);
+    write_dat("geosite.dat", kSiteEntry, sizeof kSiteEntry);
+    assert_int_equal(geo_load(g_dir), 0);
+    assert_true(geo_db_loaded());
+    char cmd[256];
+    snprintf(cmd, sizeof cmd, "rm -f %s/*.dat", g_dir);
+    assert_int_equal(system(cmd), 0);
+    assert_int_equal(geo_ip_is_cn("1.2.3.9"), 1);
+    assert_int_equal(geo_ip_is_cn("9.9.9.9"), 0);
+    assert_int_equal(geo_site_is_cn("a.example.cn"), 1);
+    assert_int_equal(geo_site_is_cn("example.com"), 0);
+}
+
 int main(void) {
     const struct CMUnitTest t[] = {
         cmocka_unit_test_setup_teardown(test_private_is_cn, setup, teardown),
@@ -206,6 +232,7 @@ int main(void) {
         cmocka_unit_test(test_resolve_dir_env_then_home_default),
         cmocka_unit_test(test_resolve_dir_no_home_falls_back_dot),
         cmocka_unit_test_setup_teardown(test_reload_replaces_without_dup, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_import_then_query_from_sqlite, setup, teardown),
     };
     return cmocka_run_group_tests(t, NULL, NULL);
 }
