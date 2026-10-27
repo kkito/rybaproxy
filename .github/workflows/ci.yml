@@ -81,12 +81,16 @@ jobs:
           ./build/rybaproxy -v | grep -F "$version"
           strings build/rybaproxy | grep -F "$(cat VERSION)"
 
+      # 只发布压缩包：Release 未 strip 且 vcpkg 依赖是静态库，gzip -9 能小 62% 左右
       - name: Package
         shell: bash
         run: |
           mkdir -p dist
-          cp build/rybaproxy "dist/rybaproxy-$version-${{ matrix.target }}"
-          (cd dist && shasum -a 256 "rybaproxy-$version-${{ matrix.target }}" > "rybaproxy-$version-${{ matrix.target }}.sha256")
+          bin="rybaproxy-$version-${{ matrix.target }}"
+          cp build/rybaproxy "dist/$bin"
+          # sha256 在 dist 里生成，记的是压缩包名，下载方 cd 进去直接 shasum -c 可用
+          (cd dist && GZIP=-9 tar -czf "$bin.tar.gz" "$bin" && rm -f "$bin")
+          (cd dist && shasum -a 256 "$bin.tar.gz" > "$bin.tar.gz.sha256")
           ls -la dist
 
       - uses: actions/upload-artifact@v4
