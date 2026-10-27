@@ -5,6 +5,12 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+# 严格 -std=c11 下 glibc 的 features.h 会隐藏 getaddrinfo/localtime_r 等 POSIX
+# 符号（struct addrinfo 直接不完整）；macOS 头文件宽松所以本地编得过、CI 编不过。
+# 统一在这里注入，避免每个 .c 各自 #define 漏一个就挂一个平台。
+# 由 test_portability 的编译期 #error 守着，宏被拿掉会立刻红。
+add_compile_definitions(_POSIX_C_SOURCE=200809L _DEFAULT_SOURCE=1)
+
 option(RYBA_ENABLE_ASAN "Enable AddressSanitizer" OFF)
 option(RYBA_ENABLE_UBSAN "Enable UndefinedBehaviorSanitizer" OFF)
 option(RYBA_ENABLE_TSAN "Enable ThreadSanitizer" OFF)

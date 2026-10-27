@@ -4,6 +4,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>   /* strncasecmp：POSIX 声明在 strings.h，macOS 的 string.h 顺带暴露
+                        * 会掩盖漏 include，Linux 严格 -std=c11 下直接编不过 */
 
 typedef struct {
     http_request_info_t *info;

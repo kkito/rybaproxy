@@ -1,4 +1,5 @@
 #include "rybaproxy/server.h"
+#include "rybaproxy/strutil.h"
 
 #include "rybaproxy/auth.h"
 #include "rybaproxy/config.h"
@@ -182,7 +183,7 @@ static void http_read_cb(struct bufferevent *bev, void *arg) {
         /* auth */
         if (srv->config.proxy_auth_enabled) {
             /* need Proxy-Authorization header; parse from reqbuf */
-            char *h = strcasestr(c->http.reqbuf, "Proxy-Authorization:");
+            const char *h = str_case_find(c->http.reqbuf, "Proxy-Authorization:");
             char val[256] = {0};
             if (h) {
                 h += strlen("Proxy-Authorization:");
