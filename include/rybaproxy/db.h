@@ -3,6 +3,10 @@
 
 #include "rybaproxy/session.h"
 
+typedef struct sqlite3 sqlite3;
+/* 出借 db 连接（geo 复用同一连接查表）；db_init 成功前返回 NULL */
+struct sqlite3 *db_handle(void);
+
 int db_init(const char *path);
 void db_set_retention(int days);
 void db_start(void);
@@ -18,5 +22,9 @@ int db_stats_top(const char *by, int limit, long long from_ms, long long to_ms, 
 int db_settings_get(char *buf, size_t bufsz);
 int db_settings_set(const char *key, const char *value);
 int db_exec_raw(const char *sql);
+/* db 文件所在目录（geo dat 落盘用）；失败返回-1 */
+int db_get_dir(char *out, size_t outsz);
+/* 加载 rules 表到内存路由（含 geo_ip/geo_site）；失败返回-1 */
+int db_rules_load(void *router);
 
 #endif

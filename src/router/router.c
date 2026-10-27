@@ -1,4 +1,5 @@
 #include "rybaproxy/router.h"
+#include "rybaproxy/geo.h"
 
 #include <ctype.h>
 #include <stdbool.h>
@@ -43,6 +44,16 @@ int router_remove_rule(router_t *r, int id) {
     return -1;
 }
 
+/* geo 条件匹配（纯函数）：无条件恒成立，否则只在已知命中/未命中时判定。
+ * 关键：cond 为空时必须短路，调用方不得发起 DNS/查表（零网络要求）。 */
+static int geo_cond_matches(const char *cond, int cn) {
+    if (!cond || !cond[0]) return 1; /* 无条件恒成立 */
+    if (cn < 0) return 0;
+    if (strcmp(cond, "cn") == 0) return cn == 1;
+    if (strcmp(cond, "!cn") == 0) return cn != 1;
+    return 0; /* 非法值：不匹配 */
+}
+
 static int rule_matches(const rule_t *rule, const char *host, int port, protocol_t proto, const char *client_ip) {
     if (!rule->enabled) return 0;
     if (rule->port != 0 && rule->port != port) return 0;
@@ -54,6 +65,9 @@ static int rule_matches(const rule_t *rule, const char *host, int port, protocol
         if (!match_cidr(rule->ip_cidr, client_ip ? client_ip : "")) return 0;
         /* if domain rule also has cidr, require both; ip-only rules should leave domain empty */
     }
+    /* 条件为空直接跳过查询：geo_host_is_cn 含 DNS，空条件调用即浪费一次解析 */
+    if (rule->geo_ip[0] && !geo_cond_matches(rule->geo_ip, geo_host_is_cn(host))) return 0;
+    if (rule->geo_site[0] && !geo_cond_matches(rule->geo_site, geo_site_is_cn(host))) return 0;
     return 1;
 }
 
@@ -70,6 +84,43 @@ int router_select(const router_t *r, const char *host, int port, protocol_t prot
     }
     if (best_idx >= 0) return r->rules[best_idx].upstream_id;
     return -1; /* caller uses default */
+}
+
+int router_add_rule_persist(router_t *r, const char cols[11][96], int *assigned_id) {
+    if (!r || !cols) return -1;
+    rule_t rule;
+    memset(&rule, 0, sizeof rule);
+    rule.id = atoi(cols[0]);
+    snprintf(rule.name, sizeof rule.name, "%s", cols[1]);
+    rule.priority = atoi(cols[2]);
+    rule.enabled = atoi(cols[3]);
+    snprintf(rule.domain_pattern, sizeof rule.domain_pattern, "%s", cols[4]);
+    snprintf(rule.geo_ip, sizeof rule.geo_ip, "%s", cols[5]);
+    snprintf(rule.geo_site, sizeof rule.geo_site, "%s", cols[6]);
+    snprintf(rule.ip_cidr, sizeof rule.ip_cidr, "%s", cols[7]);
+    rule.port = atoi(cols[8]);
+    if (strcmp(cols[9], "http") == 0) rule.protocol = PROTO_HTTP;
+    else if (strcmp(cols[9], "socks5") == 0 || strcmp(cols[9], "socks") == 0) rule.protocol = PROTO_SOCKS5;
+    else rule.protocol = 0;
+    rule.upstream_id = atoi(cols[10]);
+    if (router_add_rule(r, &rule) != 0) return -1;
+    if (assigned_id) *assigned_id = rule.id;
+    return 0;
+}
+
+int router_select_rule_id(const router_t *r, const char *host, int port, protocol_t proto, const char *client_ip) {
+    int best_idx = -1;
+    int best_prio = -1;
+    for (int i = 0; i < r->count; i++) {
+        const rule_t *rule = &r->rules[i];
+        if (!rule_matches(rule, host, port, proto, client_ip)) continue;
+        if (rule->priority > best_prio || (rule->priority == best_prio && (best_idx == -1 || rule->id < r->rules[best_idx].id))) {
+            best_prio = rule->priority;
+            best_idx = i;
+        }
+    }
+    if (best_idx >= 0) return r->rules[best_idx].id;
+    return -1;
 }
 
 /* domain matching */

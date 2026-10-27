@@ -2,6 +2,7 @@
 
 #include <stdarg.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 static log_level_t g_level = LOG_INFO;
@@ -32,6 +33,17 @@ void log_init(log_level_t level, const char *file) {
 }
 
 void log_set_level(log_level_t level) { g_level = level; }
+
+int log_level_parse(const char *s) {
+    if (!s || !*s) return LOG_INFO;
+    if (strcasecmp(s, "trace") == 0) return LOG_TRACE;
+    if (strcasecmp(s, "debug") == 0) return LOG_DEBUG;
+    if (strcasecmp(s, "info") == 0) return LOG_INFO;
+    if (strcasecmp(s, "warn") == 0 || strcasecmp(s, "warning") == 0) return LOG_WARN;
+    if (strcasecmp(s, "error") == 0) return LOG_ERROR;
+    if (strcasecmp(s, "fatal") == 0) return LOG_FATAL;
+    return LOG_INFO;
+}
 
 void log_msg(log_level_t level, const char *file, int line, const char *fmt, ...) {
     if (level < g_level) return;

@@ -2,7 +2,7 @@
 
 ## 1. 存储
 
-- SQLite 3（WAL 模式），文件默认 `/var/lib/rybaproxy/stats.db`（可配置）
+- SQLite 3（WAL 模式），文件默认 `~/.local/rybaproxy/rybaproxy.db`（可配置 `stats.db_path`；老 `stats.db` 不自动迁移，需手动处理）。geo 表（`geo_ip`/`geo_ip6`/`geo_site_exact`/`geo_site_suffix`，regex 留内存）与 stats 同库；`stats.geo_cache_size` 默认 512（0=关闭）；日志默认 `~/.local/rybaproxy/rybaproxy.log`（可配 `stats.log_file`/`stats.log_level`）
 - 写入线程单连接，批量事务；读（Web）使用只读连接或 WAL 读
 
 ## 2. 表结构

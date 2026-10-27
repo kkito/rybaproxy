@@ -5,8 +5,10 @@
 #include <string.h>
 #include <unistd.h>
 #include "rybaproxy/db.h"
+#include "rybaproxy/geo.h"
 #include "rybaproxy/session.h"
 #include "rybaproxy/web_api.h"
+#include "rybaproxy/router.h"
 
 static char g_tmpdb[128];
 
@@ -170,6 +172,33 @@ static void test_session_get_by_id(void **state) {
     assert_int_equal(db_get_session_by_id(999999999LL, buf, sizeof buf), 1);
 }
 
+static void test_geo_url_override(void **state) {
+    (void)state;
+    /* 默认源 + 环境变量覆盖：换源不用改代码 */
+    assert_true(strstr(geo_ip_url(), "geoip.dat") != NULL);
+    assert_true(strstr(geo_site_url(), "geosite.dat") != NULL);
+    setenv("RYBA_GEOIP_URL", "https://example.com/x.dat", 1);
+    assert_string_equal(geo_ip_url(), "https://example.com/x.dat");
+    unsetenv("RYBA_GEOIP_URL");
+}
+
+static void test_geo_check_validation(void **state) {
+    (void)state;
+    /* check 入参：空 host 拒绝（400 语义）；geo 三值语义抽查 */
+    assert_int_equal(geo_site_is_cn(""), -1);
+    assert_int_equal(geo_ip_is_cn(""), -1);
+}
+
+static void test_rule_geo_validation(void **state) {
+    (void)state;
+    /* 白名单校验：非法值拒绝，合法值 + 空值通过 */
+    assert_int_equal(valid_geo(""), 1);
+    assert_int_equal(valid_geo("cn"), 1);
+    assert_int_equal(valid_geo("!cn"), 1);
+    assert_int_equal(valid_geo("us"), 0);
+    assert_int_equal(valid_geo("CN"), 0);
+}
+
 static void test_settings_roundtrip(void **state) {
     (void)state;
     assert_int_equal(db_settings_set("k1", "v1"), 0);
@@ -178,6 +207,16 @@ static void test_settings_roundtrip(void **state) {
     char *s = web_envelope_json(buf, NULL, NULL);
     assert_true(strstr(s, "k1") != NULL);
     free(s);
+}
+
+static void test_geo_unknown_json_shape(void **state) {
+    (void)state;
+    /* 空库 /api/geo/check 语义：未知输出 null（不是 false），页面据此报“库未加载” */
+    geo_test_reset();
+    assert_int_equal(geo_ip_is_cn("110.242.69.21"), -1);
+    assert_int_equal(geo_site_is_cn("www.baidu.com"), -1);
+    assert_int_equal(geo_host_is_cn("1.2.3.9"), -1);
+    geo_free();
 }
 
 int main(void) {
@@ -192,6 +231,10 @@ int main(void) {
         cmocka_unit_test(test_upstream_update_not_found),
         cmocka_unit_test(test_upstream_update_ok),
         cmocka_unit_test(test_upstream_update_auth_persist),
+        cmocka_unit_test(test_rule_geo_validation),
+        cmocka_unit_test(test_geo_check_validation),
+        cmocka_unit_test(test_geo_url_override),
+        cmocka_unit_test(test_geo_unknown_json_shape),
         cmocka_unit_test_setup_teardown(test_session_get_by_id, setup, teardown),
         cmocka_unit_test_setup_teardown(test_settings_roundtrip, setup, teardown),
     };

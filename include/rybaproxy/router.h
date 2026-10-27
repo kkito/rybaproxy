@@ -13,6 +13,8 @@ typedef struct {
     int enabled;
     char name[RYBA_RULE_NAME_MAX];
     char domain_pattern[RYBA_PATTERN_MAX];
+    char geo_ip[16];
+    char geo_site[16];
     char ip_cidr[64];
     int port;          /* 0 = any */
     protocol_t protocol; /* 0 = any */
@@ -33,7 +35,11 @@ void router_free(router_t *r);
 int router_add_rule(router_t *r, const rule_t *rule);
 int router_remove_rule(router_t *r, int id);
 int router_select(const router_t *r, const char *host, int port, protocol_t proto, const char *client_ip);
+/* 返回命中规则的 id（未命中返回 -1）；供 /api/geo/check 展示 */
+int router_select_rule_id(const router_t *r, const char *host, int port, protocol_t proto, const char *client_ip);
 /* helpers exposed for tests */
 int match_domain(const char *pattern, const char *host);
 int match_cidr(const char *cidr, const char *ip);
+/* db.c 行导入：cols[11] = id,name,priority,enabled,domain,geo_ip,geo_site,cidr,port,proto,upstream */
+int router_add_rule_persist(router_t *r, const char cols[11][96], int *assigned_id);
 #endif

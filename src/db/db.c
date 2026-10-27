@@ -1,4 +1,6 @@
 #include "rybaproxy/db.h"
+#include "rybaproxy/paths.h"
+#include "rybaproxy/router.h"
 #include "rybaproxy/stats.h"
 #include "rybaproxy/upstream.h"
 
@@ -45,14 +47,25 @@ static const char *SCHEMA =
 "CREATE TABLE IF NOT EXISTS rules ("
 " id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, priority INTEGER NOT NULL DEFAULT 100,"
 " enabled INTEGER NOT NULL DEFAULT 1, domain_pattern TEXT, ip_cidr TEXT, port INTEGER DEFAULT 0,"
-" protocol TEXT DEFAULT 'any', upstream_id INTEGER NOT NULL, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);"
+" protocol TEXT DEFAULT 'any', upstream_id INTEGER NOT NULL, geo_ip TEXT DEFAULT '', geo_site TEXT DEFAULT '', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL);";
+static const char *RULES_MIGRATIONS[] = {
+"ALTER TABLE rules ADD COLUMN geo_ip TEXT DEFAULT '';",
+"ALTER TABLE rules ADD COLUMN geo_site TEXT DEFAULT '';",
+};
+static const char *SCHEMA_TAIL =
 "CREATE TABLE IF NOT EXISTS sessions ("
 " id INTEGER PRIMARY KEY, protocol TEXT NOT NULL, client_ip TEXT NOT NULL, target_host TEXT NOT NULL,"
 " target_port INTEGER NOT NULL, method TEXT, upstream_id INTEGER, upstream_name TEXT, status INTEGER NOT NULL,"
 " error_code INTEGER, error_msg TEXT, bytes_up INTEGER NOT NULL, bytes_down INTEGER NOT NULL,"
 " started_at INTEGER NOT NULL, ended_at INTEGER NOT NULL, duration_ms INTEGER NOT NULL, nginx_forwarded INTEGER NOT NULL DEFAULT 0);"
 "CREATE INDEX IF NOT EXISTS idx_sessions_started ON sessions(started_at);"
-"CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);";
+"CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+"CREATE TABLE IF NOT EXISTS geo_ip(start INTEGER NOT NULL, end INTEGER NOT NULL, cc TEXT NOT NULL);"
+"CREATE INDEX IF NOT EXISTS idx_geo_ip ON geo_ip(start, end);"
+"CREATE TABLE IF NOT EXISTS geo_ip6(s_hi INTEGER NOT NULL, s_lo INTEGER NOT NULL, e_hi INTEGER NOT NULL, e_lo INTEGER NOT NULL, cc TEXT NOT NULL);"
+"CREATE INDEX IF NOT EXISTS idx_geo_ip6 ON geo_ip6(s_hi, s_lo, e_hi, e_lo);"
+"CREATE TABLE IF NOT EXISTS geo_site_exact(host TEXT PRIMARY KEY, cc TEXT NOT NULL);"
+"CREATE TABLE IF NOT EXISTS geo_site_suffix(rev TEXT PRIMARY KEY, cc TEXT NOT NULL);";
 
 static void mkdirp(const char *path) {
     char tmp[512];
@@ -67,8 +80,27 @@ static void mkdirp(const char *path) {
     mkdir(tmp, 0755);
 }
 
+static char g_db_path[512] = "";
+
+sqlite3 *db_handle(void) { return g_db; }
+
+int db_get_dir(char *out, size_t outsz) {
+    if (!out || !outsz) return -1;
+    const char *p = g_db_path[0] ? g_db_path : "./stats.db";
+    snprintf(out, outsz, "%s", p);
+    char *slash = strrchr(out, '/');
+    if (slash) *slash = '\0';
+    else snprintf(out, outsz, ".");
+    return 0;
+}
+
 int db_init(const char *path) {
-    if (!path || !path[0]) path = "/var/lib/rybaproxy/stats.db";
+    if (!path || !path[0]) {
+        ryba_default_db_path(getenv("HOME"), g_db_path, sizeof g_db_path);
+        path = g_db_path;
+    } else {
+        snprintf(g_db_path, sizeof g_db_path, "%s", path);
+    }
     /* ensure parent dir */
     char dir[512];
     snprintf(dir, sizeof dir, "%s", path);
@@ -87,7 +119,14 @@ int db_init(const char *path) {
     char *err = NULL;
     sqlite3_exec(g_db, "PRAGMA journal_mode=WAL;", NULL, NULL, &err);
     sqlite3_exec(g_db, SCHEMA, NULL, NULL, &err);
-    if (err) { fprintf(stderr, "schema err: %s\n", err); sqlite3_free(err); }
+    sqlite3_exec(g_db, SCHEMA_TAIL, NULL, NULL, &err);
+    if (err) { sqlite3_free(err); err = NULL; }
+    /* 历史库补列：geo_ip/geo_site（新库 SCHEMA 已含，只对老库生效） */
+    for (size_t i = 0; i < sizeof RULES_MIGRATIONS / sizeof RULES_MIGRATIONS[0]; i++) {
+        char *merr = NULL;
+        sqlite3_exec(g_db, RULES_MIGRATIONS[i], NULL, NULL, &merr);
+        if (merr) sqlite3_free(merr); /* duplicate column 等可忽略 */
+    }
     /* schema version */
     sqlite3_exec(g_db, "INSERT INTO schema_version(version) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM schema_version);", NULL, NULL, NULL);
 
@@ -452,11 +491,50 @@ int db_settings_set(const char *key, const char *value) {
     return (rc == SQLITE_DONE) ? 0 : -1;
 }
 
+int db_rules_load(void *router) {
+    router_t *rt = (router_t *)router;
+    if (!rt) return -1;
+    const char *sql = "SELECT id,name,priority,enabled,domain_pattern,geo_ip,geo_site,ip_cidr,port,protocol,upstream_id FROM rules ORDER BY id;";
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    /* 逐行拼 rule_t：字段拷贝逻辑在 router.c 的导入 helper 里，避免 db.c 依赖 router 布局 */
+    char (*rows)[11][96] = NULL;
+    size_t n = 0, cap = 0;
+    int rc = 0;
+    while ((rc = sqlite3_step(st)) == SQLITE_ROW) {
+        if (n == cap) {
+            size_t ncap = cap ? cap * 2 : 16;
+            char (*nr)[11][96] = realloc(rows, ncap * sizeof *nr);
+            if (!nr) { sqlite3_finalize(st); free(rows); return -1; }
+            rows = nr; cap = ncap;
+        }
+        for (int c = 0; c < 11; c++) {
+            const unsigned char *t = sqlite3_column_text(st, c);
+            snprintf(rows[n][c], sizeof rows[n][c], "%s", t ? (const char *)t : "");
+        }
+        n++;
+    }
+    sqlite3_finalize(st);
+    if (rc != SQLITE_DONE) { free(rows); return -1; }
+    int maxid = 0;
+    for (size_t i = 0; i < n; i++) {
+        int aid = 0;
+        if (router_add_rule_persist(rt, rows[i], &aid) == 0 && aid > maxid) maxid = aid;
+    }
+    free(rows);
+    if (maxid >= rt->next_rule_id) rt->next_rule_id = maxid + 1;
+    return 0;
+}
+
+static pthread_mutex_t g_exec_lock = PTHREAD_MUTEX_INITIALIZER;
+
 int db_exec_raw(const char *sql) {
     if (!g_db || !sql) return -1;
+    pthread_mutex_lock(&g_exec_lock);
     char *err = NULL;
     int rc = sqlite3_exec(g_db, sql, NULL, NULL, &err);
     if (err) sqlite3_free(err);
+    pthread_mutex_unlock(&g_exec_lock);
     return (rc == SQLITE_OK) ? 0 : -1;
 }
 

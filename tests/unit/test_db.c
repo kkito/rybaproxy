@@ -1,7 +1,10 @@
 #include <cmocka.h>
 #include <event2/event.h>
+#include <sqlite3.h>
 #include "rybaproxy/db.h"
+#include "rybaproxy/router.h"
 #include "rybaproxy/session.h"
+#include "rybaproxy/web_api.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -171,6 +174,69 @@ static void test_db_empty_daily(void **state) {
     rm_db(path);
 }
 
+static void test_db_rules_geo_roundtrip(void **state) {
+    (void)state;
+    char path[128];
+    snprintf(path, sizeof path, "/tmp/ryba_db_rules_%d.db", (int)getpid());
+    rm_db(path);
+    assert_int_equal(db_init(path), 0);
+    rule_t r; memset(&r, 0, sizeof r);
+    r.id = 7; r.priority = 100; r.enabled = 1;
+    snprintf(r.name, sizeof r.name, "cn-ip");
+    snprintf(r.geo_ip, sizeof r.geo_ip, "cn");
+    snprintf(r.geo_site, sizeof r.geo_site, "!cn");
+    r.upstream_id = 3;
+    assert_int_equal(web_rules_db_save(&r), 0);
+    router_t rt; router_init(&rt, "direct", 1);
+    assert_int_equal(web_rules_db_load_all(&rt), 0);
+    assert_int_equal(rt.count, 1);
+    assert_int_equal(rt.rules[0].id, 7);
+    assert_string_equal(rt.rules[0].geo_ip, "cn");
+    assert_string_equal(rt.rules[0].geo_site, "!cn");
+    assert_int_equal(rt.rules[0].upstream_id, 3);
+    assert_int_equal(rt.next_rule_id, 8);
+    router_free(&rt);
+    db_stop();
+    rm_db(path);
+}
+
+static void test_db_nested_path_autocreate(void **state) {
+    (void)state;
+    /* db_init 自动建多级目录：geo 下载同理不再报 Failure writing output */
+    char path[256];
+    snprintf(path, sizeof path, "/tmp/ryba_db_nest_%d/a/b/stats.db", (int)getpid());
+    char cmd[320]; snprintf(cmd, sizeof cmd, "rm -rf /tmp/ryba_db_nest_%d", (int)getpid());
+    (void)system(cmd);
+    assert_int_equal(db_init(path), 0);
+    char dir[512];
+    assert_int_equal(db_get_dir(dir, sizeof dir), 0);
+    char expect[512]; snprintf(expect, sizeof expect, "/tmp/ryba_db_nest_%d/a/b", (int)getpid());
+    assert_string_equal(dir, expect);
+    db_stop();
+    (void)system(cmd);
+}
+
+/* RED(Task2): geo 四表存在 + db_handle 出借非 NULL */
+static void test_db_has_geo_tables(void **state) {
+    (void)state;
+    char path[128];
+    snprintf(path, sizeof path, "/tmp/ryba_db_geo_%d.db", (int)getpid());
+    rm_db(path);
+    assert_int_equal(db_init(path), 0);
+    sqlite3 *h = db_handle();
+    assert_non_null(h);
+    const char *tabs[] = {"geo_ip", "geo_ip6", "geo_site_exact", "geo_site_suffix"};
+    for (int i = 0; i < 4; i++) {
+        char sql[128];
+        snprintf(sql, sizeof sql, "SELECT COUNT(*) FROM %s", tabs[i]);
+        sqlite3_stmt *st = NULL;
+        assert_int_equal(sqlite3_prepare_v2(h, sql, -1, &st, NULL), SQLITE_OK);
+        sqlite3_finalize(st);
+    }
+    db_stop();
+    rm_db(path);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_db_roundtrip),
@@ -179,6 +245,9 @@ int main(void) {
         cmocka_unit_test(test_db_summary_top),
         cmocka_unit_test(test_db_settings),
         cmocka_unit_test(test_db_empty_daily),
+        cmocka_unit_test(test_db_rules_geo_roundtrip),
+        cmocka_unit_test(test_db_has_geo_tables),
+        cmocka_unit_test(test_db_nested_path_autocreate),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
