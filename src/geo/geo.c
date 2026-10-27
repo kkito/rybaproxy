@@ -247,21 +247,59 @@ static int parse_dat(const unsigned char *buf, size_t len, int is_ip) {
     return 0;
 }
 
-/* 数据源：开源社区维护的 GeoIP / Geosite 数据文件（换源只改这两行） */
+/* 数据源：开源社区维护的 GeoIP / Geosite 数据文件（换源只改这两行）
+ * 默认走直连（DIRECT），避免代理污染下载。环境变量可覆盖：
+ *   RYBA_GEOIP_URL / RYBA_GEOSITE_URL
+ *   RYBA_GEO_PROXY  （例如 http://127.0.0.1:18081，经本地链路下载）
+ */
 static const char *kGeoIpURL = "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geoip.dat";
 static const char *kGeoSiteURL = "https://cdn.jsdelivr.net/gh/Loyalsoldier/v2ray-rules-dat@release/geosite.dat";
+
+static const char *geo_env_or(const char *name, const char *fallback) {
+    const char *v = getenv(name);
+    return (v && *v) ? v : fallback;
+}
+
+/* 目录不存在则递归创建（dat 落盘用），失败返回 -1 */
+#include <errno.h>
+static int geo_ensure_dir(const char *dir) {
+    struct stat st;
+    if (stat(dir, &st) == 0) return S_ISDIR(st.st_mode) ? 0 : -1;
+    char tmp[1024];
+    snprintf(tmp, sizeof tmp, "%s", dir);
+    for (char *p = tmp + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (mkdir(tmp, 0755) != 0 && errno != EEXIST) return -1;
+            *p = '/';
+        }
+    }
+    if (mkdir(tmp, 0755) != 0 && errno != EEXIST) return -1;
+    return 0;
+}
 
 int geo_download(const char *dir, char *err, size_t errsz) {
     if (err && errsz) err[0] = '\0';
     if (!dir || !*dir) { if (err && errsz) snprintf(err, errsz, "empty dir"); return -1; }
-    const char *urls[2] = { kGeoIpURL, kGeoSiteURL };
+    if (geo_ensure_dir(dir) != 0) {
+        if (err && errsz) snprintf(err, errsz, "cannot create dir %s: %s", dir, strerror(errno));
+        return -1;
+    }
+    const char *urls[2] = { geo_env_or("RYBA_GEOIP_URL", kGeoIpURL),
+                            geo_env_or("RYBA_GEOSITE_URL", kGeoSiteURL) };
+    const char *proxy = getenv("RYBA_GEO_PROXY");
+    char proxy_opt[512] = "";
+    if (proxy && *proxy) snprintf(proxy_opt, sizeof proxy_opt, " -x '%s'", proxy);
     const char *names[2] = { "geoip.dat", "geosite.dat" };
     for (int i = 0; i < 2; i++) {
         char tmp[1024], dst[1024];
         snprintf(tmp, sizeof tmp, "%s/%s.tmp", dir, names[i]);
         snprintf(dst, sizeof dst, "%s/%s", dir, names[i]);
-        char cmd[2048];
-        snprintf(cmd, sizeof cmd, "curl -fsSL --max-time 60 -o '%s' '%s' 2>&1", tmp, urls[i]);
+        char cmd[2560];
+        /* --noproxy '*'：curl 默认读 http_proxy 环境变量会把流量发往代理；
+         * 加 --noproxy '*' 强制直连（除非 RYBA_GEO_PROXY 显式指定走代理）。
+         * 超时分开设：连接 15s + 总 300s（小水管也能下完 28MB）。 */
+        snprintf(cmd, sizeof cmd, "curl -fsSL --connect-timeout 15 --max-time 300 --retry 2 --noproxy '*'%s -o '%s' '%s' 2>&1", proxy_opt, tmp, urls[i]);
         FILE *p = popen(cmd, "r");
         if (!p) { if (err && errsz) snprintf(err, errsz, "popen failed: %s", names[i]); return -1; }
         char msg[512] = "";
@@ -325,6 +363,10 @@ static void geo_tables_clear(void) {
 }
 
 int geo_db_loaded(void) { return g_loaded; }
+
+const char *geo_ip_url(void) { return geo_env_or("RYBA_GEOIP_URL", kGeoIpURL); }
+const char *geo_site_url(void) { return geo_env_or("RYBA_GEOSITE_URL", kGeoSiteURL); }
+const char *geo_proxy(void) { const char *p = getenv("RYBA_GEO_PROXY"); return (p && *p) ? p : NULL; }
 size_t geo_ip_count(void) { return g_cidr_n; }
 size_t geo_site_count(void) { return g_suffix_n + g_exact_n + g_re_n; }
 

@@ -172,6 +172,16 @@ static void test_session_get_by_id(void **state) {
     assert_int_equal(db_get_session_by_id(999999999LL, buf, sizeof buf), 1);
 }
 
+static void test_geo_url_override(void **state) {
+    (void)state;
+    /* 默认源 + 环境变量覆盖：换源不用改代码 */
+    assert_true(strstr(geo_ip_url(), "geoip.dat") != NULL);
+    assert_true(strstr(geo_site_url(), "geosite.dat") != NULL);
+    setenv("RYBA_GEOIP_URL", "https://example.com/x.dat", 1);
+    assert_string_equal(geo_ip_url(), "https://example.com/x.dat");
+    unsetenv("RYBA_GEOIP_URL");
+}
+
 static void test_geo_check_validation(void **state) {
     (void)state;
     /* check 入参：空 host 拒绝（400 语义）；geo 三值语义抽查 */
@@ -213,6 +223,7 @@ int main(void) {
         cmocka_unit_test(test_upstream_update_auth_persist),
         cmocka_unit_test(test_rule_geo_validation),
         cmocka_unit_test(test_geo_check_validation),
+        cmocka_unit_test(test_geo_url_override),
         cmocka_unit_test_setup_teardown(test_session_get_by_id, setup, teardown),
         cmocka_unit_test_setup_teardown(test_settings_roundtrip, setup, teardown),
     };

@@ -560,14 +560,16 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             snprintf(p2, sizeof p2, "%s/geosite.dat", dir);
             struct stat st1, st2;
             int e1 = stat(p1, &st1), e2 = stat(p2, &st2);
-            char d[1024];
+            char d[1400];
             snprintf(d, sizeof d,
-                "{\"geoip\":{\"exists\":%s,\"size\":%lld,\"mtime\":%lld,\"cn_count\":%zu},"
-                "\"geosite\":{\"exists\":%s,\"size\":%lld,\"mtime\":%lld,\"cn_count\":%zu}}",
+                "{\"geoip\":{\"exists\":%s,\"size\":%lld,\"mtime\":%lld,\"cn_count\":%zu,\"url\":\"%s\"},"
+                "\"geosite\":{\"exists\":%s,\"size\":%lld,\"mtime\":%lld,\"cn_count\":%zu,\"url\":\"%s\"},"
+                "\"dir\":\"%s\",\"proxy\":\"%s\"}",
                 e1 == 0 ? "true" : "false", e1 == 0 ? (long long)st1.st_size : 0,
-                e1 == 0 ? (long long)st1.st_mtime : 0, e1 == 0 ? geo_ip_count() : 0,
+                e1 == 0 ? (long long)st1.st_mtime : 0, e1 == 0 ? geo_ip_count() : 0, geo_ip_url(),
                 e2 == 0 ? "true" : "false", e2 == 0 ? (long long)st2.st_size : 0,
-                e2 == 0 ? (long long)st2.st_mtime : 0, e2 == 0 ? geo_site_count() : 0);
+                e2 == 0 ? (long long)st2.st_mtime : 0, e2 == 0 ? geo_site_count() : 0, geo_site_url(),
+                dir, geo_proxy() ? geo_proxy() : "");
             send_envelope(conn, 200, web_envelope_json(d, NULL, NULL));
             return;
         }

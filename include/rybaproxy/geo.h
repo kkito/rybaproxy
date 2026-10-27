@@ -16,6 +16,10 @@ int geo_site_is_cn(const char *host);
 int geo_host_is_cn(const char *host);
 /* 从目录加载 geoip.dat + geosite.dat；缺文件返回-1（旧数据保留） */
 int geo_load(const char *dir);
+/* 当前数据源 URL（环境变量覆盖后生效）；调用方不要 free */
+const char *geo_ip_url(void);
+const char *geo_site_url(void);
+const char *geo_proxy(void);
 size_t geo_ip_count(void);
 size_t geo_site_count(void);
 /* 下载 dat 到 dir（tmp+rename 原子落盘，成功后 geo_load）；失败 err 写原因 */

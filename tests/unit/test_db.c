@@ -199,6 +199,22 @@ static void test_db_rules_geo_roundtrip(void **state) {
     rm_db(path);
 }
 
+static void test_db_nested_path_autocreate(void **state) {
+    (void)state;
+    /* db_init 自动建多级目录：geo 下载同理不再报 Failure writing output */
+    char path[256];
+    snprintf(path, sizeof path, "/tmp/ryba_db_nest_%d/a/b/stats.db", (int)getpid());
+    char cmd[320]; snprintf(cmd, sizeof cmd, "rm -rf /tmp/ryba_db_nest_%d", (int)getpid());
+    (void)system(cmd);
+    assert_int_equal(db_init(path), 0);
+    char dir[512];
+    assert_int_equal(db_get_dir(dir, sizeof dir), 0);
+    char expect[512]; snprintf(expect, sizeof expect, "/tmp/ryba_db_nest_%d/a/b", (int)getpid());
+    assert_string_equal(dir, expect);
+    db_stop();
+    (void)system(cmd);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_db_roundtrip),
@@ -208,6 +224,7 @@ int main(void) {
         cmocka_unit_test(test_db_settings),
         cmocka_unit_test(test_db_empty_daily),
         cmocka_unit_test(test_db_rules_geo_roundtrip),
+        cmocka_unit_test(test_db_nested_path_autocreate),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

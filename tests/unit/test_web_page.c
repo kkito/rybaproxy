@@ -57,8 +57,9 @@ static void test_page_geo_hooks_tail(void **state) {
     assert_true(strstr(WEB_PAGE_HTML, "/api/geo/check") != NULL);
     assert_true(strstr(WEB_PAGE_HTML, "geoip:cn") != NULL);
     assert_true(strstr(WEB_PAGE_HTML, "geosite:cn") != NULL);
-    /* 旧 number 手填框已移除，出口是下拉 */
+    /* 旧 number 手填框已移除，出口是下拉；管理卡展示下载源/目录 */
     assert_true(strstr(WEB_PAGE_HTML, "name=\"upstream_id\" type=\"number\"") == NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "geoSrc") != NULL);
 }
 
 int main(void) {
