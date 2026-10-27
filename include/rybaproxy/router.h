@@ -13,6 +13,8 @@ typedef struct {
     int enabled;
     char name[RYBA_RULE_NAME_MAX];
     char domain_pattern[RYBA_PATTERN_MAX];
+    char geo_ip[16];
+    char geo_site[16];
     char ip_cidr[64];
     int port;          /* 0 = any */
     protocol_t protocol; /* 0 = any */

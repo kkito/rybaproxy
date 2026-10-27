@@ -1,4 +1,5 @@
 #include "rybaproxy/router.h"
+#include "rybaproxy/geo.h"
 
 #include <ctype.h>
 #include <stdbool.h>
@@ -53,6 +54,18 @@ static int rule_matches(const rule_t *rule, const char *host, int port, protocol
     if (rule->ip_cidr[0]) {
         if (!match_cidr(rule->ip_cidr, client_ip ? client_ip : "")) return 0;
         /* if domain rule also has cidr, require both; ip-only rules should leave domain empty */
+    }
+    if (rule->geo_ip[0]) {
+        int cn = geo_host_is_cn(host);
+        if (strcmp(rule->geo_ip, "cn") == 0 && cn != 1) return 0;
+        else if (strcmp(rule->geo_ip, "!cn") == 0 && cn == 1) return 0;
+        else if (rule->geo_ip[0] && strcmp(rule->geo_ip, "cn") != 0 && strcmp(rule->geo_ip, "!cn") != 0) return 0;
+    }
+    if (rule->geo_site[0]) {
+        int cn = geo_site_is_cn(host);
+        if (strcmp(rule->geo_site, "cn") == 0 && cn != 1) return 0;
+        else if (strcmp(rule->geo_site, "!cn") == 0 && cn == 1) return 0;
+        else if (rule->geo_site[0] && strcmp(rule->geo_site, "cn") != 0 && strcmp(rule->geo_site, "!cn") != 0) return 0;
     }
     return 1;
 }

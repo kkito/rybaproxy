@@ -1,6 +1,9 @@
 #include <cmocka.h>
 #include "rybaproxy/router.h"
+#include "rybaproxy/geo.h"
+#include <stdio.h>
 #include <string.h>
+#include <unistd.h>
 
 static void test_domain_wildcard(void **state) {
     (void)state;
@@ -52,6 +55,85 @@ static void test_remove_rule(void **state) {
     router_free(&r);
 }
 
+/* geo 条件单测：构造迷你 wire dat 预置 1.2.3.0/24 + suffix example.cn */
+static const unsigned char kIpEntry[] = {
+    0x0A, 0x02, 'C', 'N',
+    0x12, 0x08, 0x0A, 0x04, 1, 2, 3, 0, 0x10, 0x18,
+};
+static const unsigned char kSiteEntry[] = {
+    0x0A, 0x02, 'C', 'N',
+    0x12, 0x0E, 0x08, 0x02,
+    0x12, 0x0A, 'e','x','a','m','p','l','e','.','c','n',
+};
+static char g_dir[128];
+static int geo_setup(void **s) {
+    (void)s;
+    snprintf(g_dir, sizeof g_dir, "/tmp/ryba_rgeo_%d", (int)getpid());
+    char cmd[256];
+    snprintf(cmd, sizeof cmd, "rm -rf %s && mkdir -p %s", g_dir, g_dir);
+    if (system(cmd) != 0) return -1;
+    char path[256];
+    snprintf(path, sizeof path, "%s/geoip.dat", g_dir);
+    FILE *f = fopen(path, "wb");
+    unsigned char h[2] = { 0x0A, (unsigned char)sizeof kIpEntry };
+    fwrite(h, 1, 2, f); fwrite(kIpEntry, 1, sizeof kIpEntry, f); fclose(f);
+    snprintf(path, sizeof path, "%s/geosite.dat", g_dir);
+    f = fopen(path, "wb");
+    h[1] = (unsigned char)sizeof kSiteEntry;
+    fwrite(h, 1, 2, f); fwrite(kSiteEntry, 1, sizeof kSiteEntry, f); fclose(f);
+    geo_init();
+    if (geo_load(g_dir) != 0) return -1;
+    return 0;
+}
+static int geo_teardown(void **s) {
+    (void)s;
+    geo_free();
+    char cmd[256];
+    snprintf(cmd, sizeof cmd, "rm -rf %s", g_dir);
+    (void)system(cmd);
+    return 0;
+}
+static void test_rule_geo_ip_cn(void **s) {
+    (void)s;
+    router_t r; router_init(&r, "direct", 1);
+    rule_t rule = {0}; rule.id=1; rule.priority=100; rule.enabled=1;
+    strcpy(rule.geo_ip, "cn"); rule.upstream_id=5;
+    router_add_rule(&r, &rule);
+    assert_int_equal(router_select(&r, "1.2.3.9", 80, PROTO_HTTP, NULL), 5);
+    assert_int_equal(router_select(&r, "9.9.9.9", 80, PROTO_HTTP, NULL), -1);
+    router_free(&r);
+}
+static void test_rule_geo_ip_neg(void **s) {
+    (void)s;
+    router_t r; router_init(&r, "direct", 1);
+    rule_t rule = {0}; rule.id=1; rule.priority=100; rule.enabled=1;
+    strcpy(rule.geo_ip, "!cn"); rule.upstream_id=6;
+    router_add_rule(&r, &rule);
+    assert_int_equal(router_select(&r, "9.9.9.9", 80, PROTO_HTTP, NULL), 6);
+    assert_int_equal(router_select(&r, "1.2.3.9", 80, PROTO_HTTP, NULL), -1);
+    router_free(&r);
+}
+static void test_rule_geo_site_cn(void **s) {
+    (void)s;
+    router_t r; router_init(&r, "direct", 1);
+    rule_t rule = {0}; rule.id=1; rule.priority=100; rule.enabled=1;
+    strcpy(rule.geo_site, "cn"); rule.upstream_id=7;
+    router_add_rule(&r, &rule);
+    assert_int_equal(router_select(&r, "a.example.cn", 80, PROTO_HTTP, NULL), 7);
+    assert_int_equal(router_select(&r, "a.example.com", 80, PROTO_HTTP, NULL), -1);
+    router_free(&r);
+}
+static void test_rule_geo_and_domain(void **s) {
+    (void)s;
+    router_t r; router_init(&r, "direct", 1);
+    rule_t rule = {0}; rule.id=1; rule.priority=100; rule.enabled=1;
+    strcpy(rule.domain_pattern, "*.example.cn"); strcpy(rule.geo_site, "cn"); rule.upstream_id=8;
+    router_add_rule(&r, &rule);
+    assert_int_equal(router_select(&r, "a.example.cn", 80, PROTO_HTTP, NULL), 8);
+    assert_int_equal(router_select(&r, "b.other.cn", 80, PROTO_HTTP, NULL), -1);
+    router_free(&r);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_domain_wildcard),
@@ -59,6 +141,10 @@ int main(void) {
         cmocka_unit_test(test_select_priority),
         cmocka_unit_test(test_select_default),
         cmocka_unit_test(test_remove_rule),
+        cmocka_unit_test_setup_teardown(test_rule_geo_ip_cn, geo_setup, geo_teardown),
+        cmocka_unit_test_setup_teardown(test_rule_geo_ip_neg, geo_setup, geo_teardown),
+        cmocka_unit_test_setup_teardown(test_rule_geo_site_cn, geo_setup, geo_teardown),
+        cmocka_unit_test_setup_teardown(test_rule_geo_and_domain, geo_setup, geo_teardown),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
