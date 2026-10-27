@@ -169,3 +169,58 @@ int upstream_connect_socks5(const upstream_profile_t *up, const char *target_hos
     *out_fd = fd;
     return 0;
 }
+
+#include <time.h>
+
+int upstream_test_reachable(const upstream_profile_t *up, int timeout_ms, long *latency_ms_out) {
+    if (latency_ms_out) *latency_ms_out = -1;
+    if (!up) return -1;
+    if (up->type == UPSTREAM_DIRECT) {
+        if (latency_ms_out) *latency_ms_out = 0;
+        return 0;
+    }
+    if (!up->host[0] || up->port == 0) return -1;
+    if (timeout_ms <= 0) timeout_ms = 3000;
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    struct addrinfo hints, *res = NULL;
+    memset(&hints, 0, sizeof hints);
+    hints.ai_family = AF_UNSPEC;
+    hints.ai_socktype = SOCK_STREAM;
+    char portstr[16];
+    snprintf(portstr, sizeof portstr, "%u", up->port);
+    if (getaddrinfo(up->host, portstr, &hints, &res) != 0) return -1;
+    int sec = timeout_ms / 1000;
+    int msec = timeout_ms % 1000;
+    int ok = -1;
+    for (struct addrinfo *ai = res; ai; ai = ai->ai_next) {
+        int fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
+        if (fd < 0) continue;
+        int flags = fcntl(fd, F_GETFL, 0);
+        fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+        struct timeval tv = { .tv_sec = sec, .tv_usec = msec * 1000 };
+        int rc;
+        if (connect(fd, ai->ai_addr, ai->ai_addrlen) == 0) rc = 0;
+        else if (errno != EINPROGRESS) rc = -1;
+        else {
+            fd_set wfds;
+            FD_ZERO(&wfds);
+            FD_SET(fd, &wfds);
+            rc = select(fd + 1, NULL, &wfds, NULL, &tv);
+            if (rc > 0) {
+                int soerr = 0;
+                socklen_t sl = sizeof soerr;
+                getsockopt(fd, SOL_SOCKET, SO_ERROR, &soerr, &sl);
+                rc = (soerr == 0) ? 1 : -1;
+            } else rc = -1;
+        }
+        close(fd);
+        if (rc >= 0) { ok = 0; break; }
+    }
+    freeaddrinfo(res);
+    if (ok == 0 && latency_ms_out) {
+        clock_gettime(CLOCK_MONOTONIC, &t1);
+        *latency_ms_out = (t1.tv_sec - t0.tv_sec) * 1000L + (t1.tv_nsec - t0.tv_nsec) / 1000000L;
+    }
+    return ok;
+}
