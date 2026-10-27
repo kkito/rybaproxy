@@ -1,5 +1,6 @@
 #include "rybaproxy/config.h"
 #include "rybaproxy/log.h"
+#include "rybaproxy/paths.h"
 #include "rybaproxy/server.h"
 #include "rybaproxy/stats.h"
 #include "rybaproxy/db.h"
@@ -33,8 +34,6 @@ int main(int argc, char **argv) {
         }
     }
     log_init(LOG_INFO, NULL);
-    stats_init();
-
     config_t cfg;
     config_init_defaults(&cfg);
     if (config_path) {
@@ -43,6 +42,24 @@ int main(int argc, char **argv) {
             return 1;
         }
     }
+
+    /* 日志落盘：默认 <data>/rybaproxy.log；目录自动建，失败回退 stderr */
+    {
+        log_level_t lvl = (log_level_t)log_level_parse(cfg.log_level);
+        char logdir[1024];
+        snprintf(logdir, sizeof logdir, "%s", cfg.log_file);
+        char *slash = strrchr(logdir, '/');
+        if (slash) { *slash = '\0'; ryba_ensure_dir(logdir); }
+        FILE *probe = cfg.log_file[0] ? fopen(cfg.log_file, "a") : NULL;
+        if (probe) { fclose(probe); log_init(lvl, cfg.log_file); }
+        else {
+            log_init(lvl, NULL);
+            if (cfg.log_file[0])
+                fprintf(stderr, "warn: cannot open log %s, fallback to stderr\n", cfg.log_file);
+        }
+    }
+    geo_set_cache_size(cfg.geo_cache_size);
+    stats_init();
 
     if (db_init(cfg.db_path) != 0) { fprintf(stderr, "db_init failed\n"); }
     db_set_retention(cfg.retention_days);

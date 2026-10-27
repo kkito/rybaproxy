@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include "rybaproxy/config.h"
+#include "rybaproxy/log.h"
 
 static void test_config_defaults(void **state) {
     (void)state;
@@ -27,6 +28,8 @@ static void test_config_defaults_data_dir(void **state) {
         assert_string_equal(c.db_path, expect);
     }
     assert_string_equal(c.geo_dir, "");
+    assert_string_equal(c.log_level, "info");
+    assert_int_equal(c.geo_cache_size, 512);
 }
 
 static void test_config_load_geo_dir(void **state) {
@@ -75,6 +78,14 @@ static void test_config_defaults_db_log_cache(void **s) {
     assert_int_equal(c.geo_cache_size, 512);
 }
 
+static void test_log_level_parse(void **s) {
+    (void)s;
+    /* RED(Task5): 级别名纯函数 */
+    assert_int_equal(log_level_parse("debug"), LOG_DEBUG);
+    assert_int_equal(log_level_parse("WARN"), LOG_WARN);
+    assert_int_equal(log_level_parse("nonsense"), LOG_INFO);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_config_defaults),
@@ -82,6 +93,7 @@ int main(void) {
         cmocka_unit_test(test_config_load_geo_dir),
         cmocka_unit_test(test_config_load),
         cmocka_unit_test(test_config_defaults_db_log_cache),
+        cmocka_unit_test(test_log_level_parse),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
