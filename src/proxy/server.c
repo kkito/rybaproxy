@@ -470,8 +470,17 @@ int server_init(server_ctx_t *ctx, const config_t *cfg) {
     memset(ctx, 0, sizeof *ctx);
     pthread_mutex_init(&ctx->lock, NULL);
     ctx->config = *cfg;
-    ctx->upstreams = cfg->upstreams;
-    ctx->upstream_count = cfg->upstream_count;
+    ctx->config.upstreams = NULL;
+    ctx->config.upstream_count = 0;
+    /* deep copy: ctx owns its array, config keeps its own (no double free) */
+    if (cfg->upstream_count > 0 && cfg->upstreams) {
+        ctx->upstreams = calloc((size_t)cfg->upstream_count, sizeof(upstream_profile_t));
+        if (ctx->upstreams) {
+            memcpy(ctx->upstreams, cfg->upstreams,
+                   (size_t)cfg->upstream_count * sizeof(upstream_profile_t));
+            ctx->upstream_count = cfg->upstream_count;
+        }
+    }
     ensure_direct(ctx);
 
     router_init(&ctx->router, ctx->config.default_upstream, ctx->config.fallback_to_direct);

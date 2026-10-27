@@ -112,9 +112,14 @@ int web_upstreams_update(server_ctx_t *srv, int id, const char *body, char **out
     if ((v = cJSON_GetObjectItem(j, "host")) && cJSON_IsString(v))
         snprintf(u->host, sizeof u->host, "%s", v->valuestring);
     if ((v = cJSON_GetObjectItem(j, "port"))) u->port = (uint16_t)v->valueint;
+    if ((v = cJSON_GetObjectItem(j, "username")) && cJSON_IsString(v))
+        snprintf(u->username, sizeof u->username, "%s", v->valuestring);
+    if ((v = cJSON_GetObjectItem(j, "password")) && cJSON_IsString(v))
+        snprintf(u->password, sizeof u->password, "%s", v->valuestring);
     if ((v = cJSON_GetObjectItem(j, "enabled"))) u->enabled = cJSON_IsTrue(v) ? 1 : 0;
     int uid = u->id;
     char sql_esc_name[RYBA_NAME_MAX * 2 + 1], sql_esc_host[512 + 1];
+    char sql_esc_user[128 * 2 + 1], sql_esc_pass[128 * 2 + 1];
     /* minimal ' escape for SQL */
     size_t k = 0;
     for (size_t i = 0; u->name[i] && k + 2 < sizeof sql_esc_name; i++) {
@@ -128,14 +133,26 @@ int web_upstreams_update(server_ctx_t *srv, int id, const char *body, char **out
         sql_esc_host[k++] = u->host[i];
     }
     sql_esc_host[k] = '\0';
-    char sql[1600];
+    k = 0;
+    for (size_t i = 0; u->username[i] && k + 2 < sizeof sql_esc_user; i++) {
+        if (u->username[i] == '\'') sql_esc_user[k++] = '\'';
+        sql_esc_user[k++] = u->username[i];
+    }
+    sql_esc_user[k] = '\0';
+    k = 0;
+    for (size_t i = 0; u->password[i] && k + 2 < sizeof sql_esc_pass; i++) {
+        if (u->password[i] == '\'') sql_esc_pass[k++] = '\'';
+        sql_esc_pass[k++] = u->password[i];
+    }
+    sql_esc_pass[k] = '\0';
+    char sql[2200];
     const char *tstr = upstream_type_str(u->type);
     snprintf(sql, sizeof sql,
-        "INSERT INTO upstream_profiles(id,name,type,host,port,enabled,created_at,updated_at) "
-        "VALUES(%d,'%s','%s','%s',%d,%d,strftime('%%s','now'),strftime('%%s','now')) "
-        "ON CONFLICT(id) DO UPDATE SET name='%s',type='%s',host='%s',port=%d,enabled=%d,updated_at=strftime('%%s','now');",
-        uid, sql_esc_name, tstr, sql_esc_host, u->port, u->enabled,
-        sql_esc_name, tstr, sql_esc_host, u->port, u->enabled);
+        "INSERT INTO upstream_profiles(id,name,type,host,port,username,password,enabled,created_at,updated_at) "
+        "VALUES(%d,'%s','%s','%s',%d,'%s','%s',%d,strftime('%%s','now'),strftime('%%s','now')) "
+        "ON CONFLICT(id) DO UPDATE SET name='%s',type='%s',host='%s',port=%d,username='%s',password='%s',enabled=%d,updated_at=strftime('%%s','now');",
+        uid, sql_esc_name, tstr, sql_esc_host, u->port, sql_esc_user, sql_esc_pass, u->enabled,
+        sql_esc_name, tstr, sql_esc_host, u->port, sql_esc_user, sql_esc_pass, u->enabled);
     pthread_mutex_unlock(&srv->lock);
     cJSON_Delete(j);
     /* NOTE: db persistence for upstreams requires a db handle API; memory update done above.
@@ -301,6 +318,8 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             if ((v = cJSON_GetObjectItem(j, "type")) && cJSON_IsString(v)) u->type = upstream_type_from_str(v->valuestring);
             if ((v = cJSON_GetObjectItem(j, "host")) && cJSON_IsString(v)) snprintf(u->host, sizeof u->host, "%s", v->valuestring);
             if ((v = cJSON_GetObjectItem(j, "port"))) u->port = (uint16_t)v->valueint;
+            if ((v = cJSON_GetObjectItem(j, "username")) && cJSON_IsString(v)) snprintf(u->username, sizeof u->username, "%s", v->valuestring);
+            if ((v = cJSON_GetObjectItem(j, "password")) && cJSON_IsString(v)) snprintf(u->password, sizeof u->password, "%s", v->valuestring);
             u->enabled = 1;
             if ((v = cJSON_GetObjectItem(j, "enabled"))) u->enabled = cJSON_IsTrue(v);
             int newid = u->id;
@@ -342,6 +361,8 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             cJSON_AddStringToObject(o, "type", upstream_type_str(u->type));
             cJSON_AddStringToObject(o, "host", u->host);
             cJSON_AddNumberToObject(o, "port", u->port);
+            cJSON_AddStringToObject(o, "username", u->username);
+            cJSON_AddBoolToObject(o, "has_password", u->password[0] ? 1 : 0);
             cJSON_AddBoolToObject(o, "enabled", u->enabled);
             cJSON_AddItemToArray(arr, o);
         }

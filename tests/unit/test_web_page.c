@@ -16,6 +16,7 @@ static void test_page_uses_real_apis(void **state) {
 static void test_page_has_hooks(void **state) {
     (void)state;
     assert_true(strstr(WEB_PAGE_HTML, "sessPager") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "username") != NULL);
     assert_true(strstr(WEB_PAGE_HTML, "fltClient") != NULL);
     assert_true(strstr(WEB_PAGE_HTML, "data-test") != NULL);
     assert_true(strstr(WEB_PAGE_HTML, "ryba-stat") != NULL);

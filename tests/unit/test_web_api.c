@@ -112,6 +112,28 @@ static void test_upstream_update_not_found(void **state) {
     pthread_mutex_destroy(&srv.lock);
 }
 
+static void test_upstream_update_auth_persist(void **state) {
+    (void)state;
+    server_ctx_t srv; memset(&srv, 0, sizeof srv);
+    pthread_mutex_init(&srv.lock, NULL);
+    srv.upstreams = calloc(1, sizeof(upstream_profile_t));
+    srv.upstream_count = 1;
+    srv.upstreams[0].id = 7;
+    char *out = NULL; int status = 0;
+    assert_int_equal(web_upstreams_update(&srv, 7, "{\"username\":\"admin\",\"password\":\"s3cret\"}", &out, &status), 0);
+    assert_int_equal(status, 200);
+    assert_string_equal(srv.upstreams[0].username, "admin");
+    assert_string_equal(srv.upstreams[0].password, "s3cret");
+    free(out);
+    /* password omitted in PUT => must keep old secret (no wipe) */
+    assert_int_equal(web_upstreams_update(&srv, 7, "{\"name\":\"hk\"}", &out, &status), 0);
+    assert_string_equal(srv.upstreams[0].username, "admin");
+    assert_string_equal(srv.upstreams[0].password, "s3cret");
+    free(out);
+    free(srv.upstreams);
+    pthread_mutex_destroy(&srv.lock);
+}
+
 static void test_upstream_update_ok(void **state) {
     (void)state;
     server_ctx_t srv; memset(&srv, 0, sizeof srv);
@@ -169,6 +191,7 @@ int main(void) {
         cmocka_unit_test(test_rule_reload_sorts),
         cmocka_unit_test(test_upstream_update_not_found),
         cmocka_unit_test(test_upstream_update_ok),
+        cmocka_unit_test(test_upstream_update_auth_persist),
         cmocka_unit_test_setup_teardown(test_session_get_by_id, setup, teardown),
         cmocka_unit_test_setup_teardown(test_settings_roundtrip, setup, teardown),
     };
