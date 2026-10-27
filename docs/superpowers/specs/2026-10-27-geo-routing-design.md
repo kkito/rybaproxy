@@ -2,12 +2,12 @@
 
 - 日期：2026-10-27
 - 范围：规则新增 `geo_ip / geo_site` 条件（`cn / !cn`），IP 库界面手动下载，检测小页面
-- 生态：v2ray dat（Loyalsoldier `geoip.dat` + `geosite.dat`），自研小解析器，不引入 libmaxminddb
+- 生态：开源社区维护的 GeoIP / Geosite 数据文件（`geoip.dat` + `geosite.dat`），自研小解析器，不引入外部 C 库依赖
 
 ## 1. 背景与目标
 
 当前 `rule_t` 只有 `domain_pattern`（手写单条）、`ip_cidr`（且匹配的是 **client_ip**，目标站 IP 不参与选路）、端口、协议。
-目标：配出"国内直连、国外走代理"，语义对标 v2ray：
+目标：配出“国内直连、国外走代理”，标准语义：
 
 - `geoip:cn` = 中国 IP 段集合；`geosite:cn` = 中国域名集合
 - 标准配法 = 两条 CN 规则（高优先级 → direct）+ 兜底 `default_upstream` 走代理
@@ -29,13 +29,13 @@ char geo_site[16];  // ""=不限 | "cn" | "!cn"
 
 ### 2.2 geo 数据文件
 
-- 来源：Loyalsoldier GitHub raw 的 `geoip.dat` + `geosite.dat`（免 key，内容每周跟 MaxMind 同步）。
+- 来源：开源社区维护的 `geoip.dat` + `geosite.dat`（代码仓库直接下载，免注册，每周同步更新）。
 - 存放：db 同目录，`geoip.dat` / `geosite.dat`，路径可在设置里改，默认与 `db_path` 同目录。
-- 格式：v2ray 私有 protobuf/varint 编码，自研解析器（~300 行，格式公开可参照实现），无新第三方依赖。
+- 格式：protobuf/varint 编码的二进制数据文件，自研解析器（约 300 行，格式公开），无新第三方依赖。
 - 内存结构：
   - IP：全量 CIDR（含 IPv4/IPv6）按地址排序，二分查找；顺手补齐现有 `match_cidr` 只支持 IPv4 的短板（geo 路径走新实现，老 `ip_cidr` 语义不动）。
   - 域名：清单建成后缀 Trie，支持 exact / 子域名包含 / regex 三类（regex 用 libc `regcomp` 预编译）。
-- 私网 IP（10/8、172.16/12、192.168/16、127/8、::1、fc00::/7 等）视为命中 `cn`（对标 v2ray `geoip:private` 进 direct）。
+- 私网 IP(10/8、172.16/12、192.168/16、127/8、::1、fc00::/7 等)视为命中 `cn`（私网地址默认走直连）。
 
 ### 2.3 匹配语义
 
@@ -68,7 +68,7 @@ char geo_site[16];  // ""=不限 | "cn" | "!cn"
 ### 3.1 规则 API（现有接口扩展字段）
 
 - `GET /api/rules`：每条多出 `geo_ip`, `geo_site`。
-- `POST /api/rules`, `PUT /api/rules/:id`：接受两字段，仅允许 `"" / "cn" / "!cn"`，非法值 → 400 `BAD_REQUEST`。
+- `POST /api/rules`, `PUT /api/rules/:id`:接受两字段,仅允许 `"" / "cn" / "!cn"`，无效值 → 400 `BAD_REQUEST`。
 
 ### 3.2 Geo 管理 API（新增）
 
@@ -94,7 +94,7 @@ CSS 不动，只改 JS（沿用 Task4 模式，`web_page.h` 内联）：
 | dat 文件缺失/损坏 | 含 geo 条件规则不命中 + `web_log_push(WARN)`；转发不受影响 |
 | 下载失败（网络/超时/校验） | 保留旧文件，API 返回 502 + 错误信息，界面 toast |
 | DNS 解析失败 | 该次按未知处理（cn 不命中 / !cn 命中），不缓存失败结果 |
-| 非法 geo 值写入 | 400 BAD_REQUEST |
+| 无效 geo 值写入 | 400 BAD_REQUEST |
 
 ## 6. 测试计划
 
