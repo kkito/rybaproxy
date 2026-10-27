@@ -69,8 +69,21 @@ static void mkdirp(const char *path) {
     mkdir(tmp, 0755);
 }
 
+static char g_db_path[512] = "";
+
+int db_get_dir(char *out, size_t outsz) {
+    if (!out || !outsz) return -1;
+    const char *p = g_db_path[0] ? g_db_path : "./stats.db";
+    snprintf(out, outsz, "%s", p);
+    char *slash = strrchr(out, '/');
+    if (slash) *slash = '\0';
+    else snprintf(out, outsz, ".");
+    return 0;
+}
+
 int db_init(const char *path) {
     if (!path || !path[0]) path = "/var/lib/rybaproxy/stats.db";
+    snprintf(g_db_path, sizeof g_db_path, "%s", path);
     /* ensure parent dir */
     char dir[512];
     snprintf(dir, sizeof dir, "%s", path);

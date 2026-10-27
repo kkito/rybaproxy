@@ -18,5 +18,7 @@ int geo_host_is_cn(const char *host);
 int geo_load(const char *dir);
 size_t geo_ip_count(void);
 size_t geo_site_count(void);
+/* 下载 dat 到 dir（tmp+rename 原子落盘，成功后 geo_load）；失败 err 写原因 */
+int geo_download(const char *dir, char *err, size_t errsz);
 
 #endif

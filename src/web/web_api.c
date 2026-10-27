@@ -4,11 +4,16 @@
 #include "rybaproxy/router.h"
 #include "rybaproxy/upstream.h"
 
+#include "rybaproxy/geo.h"
+
+#include <arpa/inet.h>
 #include <civetweb.h>
 #include <cjson/cJSON.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <time.h>
 
 #ifndef RYBA_VERSION
@@ -498,6 +503,101 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
         send_envelope(conn, 200, web_envelope_json(s ? s : "[]", NULL, NULL));
         if (s) free(s);
         cJSON_Delete(arr);
+        return;
+    }
+    if (strncmp(uri, "/api/geo", 8) == 0) {
+        if (strcmp(uri, "/api/geo/status") == 0 && strcmp(method, "GET") == 0) {
+            char dir[512];
+            const char *envd = getenv("RYBA_GEO_DIR");
+            if (envd && *envd) snprintf(dir, sizeof dir, "%s", envd);
+            else if (db_get_dir(dir, sizeof dir) != 0) snprintf(dir, sizeof dir, ".");
+            char p1[1024], p2[1024];
+            snprintf(p1, sizeof p1, "%s/geoip.dat", dir);
+            snprintf(p2, sizeof p2, "%s/geosite.dat", dir);
+            struct stat st1, st2;
+            int e1 = stat(p1, &st1), e2 = stat(p2, &st2);
+            char d[1024];
+            snprintf(d, sizeof d,
+                "{\"geoip\":{\"exists\":%s,\"size\":%lld,\"mtime\":%lld,\"cn_count\":%zu},"
+                "\"geosite\":{\"exists\":%s,\"size\":%lld,\"mtime\":%lld,\"cn_count\":%zu}}",
+                e1 == 0 ? "true" : "false", e1 == 0 ? (long long)st1.st_size : 0,
+                e1 == 0 ? (long long)st1.st_mtime : 0, e1 == 0 ? geo_ip_count() : 0,
+                e2 == 0 ? "true" : "false", e2 == 0 ? (long long)st2.st_size : 0,
+                e2 == 0 ? (long long)st2.st_mtime : 0, e2 == 0 ? geo_site_count() : 0);
+            send_envelope(conn, 200, web_envelope_json(d, NULL, NULL));
+            return;
+        }
+        if (strcmp(uri, "/api/geo/download") == 0 && strcmp(method, "POST") == 0) {
+            char dir[512];
+            const char *envd = getenv("RYBA_GEO_DIR");
+            if (envd && *envd) snprintf(dir, sizeof dir, "%s", envd);
+            else if (db_get_dir(dir, sizeof dir) != 0) snprintf(dir, sizeof dir, ".");
+            char err[512];
+            if (geo_download(dir, err, sizeof err) != 0) {
+                char m[640];
+                snprintf(m, sizeof m, "download failed: %s", err);
+                send_envelope(conn, 502, web_envelope_json(NULL, "DOWNLOAD_FAILED", m));
+                return;
+            }
+            send_envelope(conn, 200, web_envelope_json("{\"ok\":true}", NULL, NULL));
+            return;
+        }
+        if (strcmp(uri, "/api/geo/check") == 0 && strcmp(method, "GET") == 0) {
+            char host[256];
+            qstr(query, "host", host, sizeof host);
+            if (!host[0]) { send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "host required")); return; }
+            char iplist[512] = "";
+            struct in_addr a4; struct in6_addr a6;
+            char first_ip[64] = "";
+            if (inet_pton(AF_INET, host, &a4) == 1 || inet_pton(AF_INET6, host, &a6) == 1) {
+                snprintf(iplist, sizeof iplist, "[\"%s\"]", host);
+                snprintf(first_ip, sizeof first_ip, "%s", host);
+            } else {
+                struct addrinfo hints, *res = NULL;
+                memset(&hints, 0, sizeof hints);
+                hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM;
+                if (getaddrinfo(host, "80", &hints, &res) == 0 && res) {
+                    char tmp[64]; size_t off = 0; int n = 0;
+                    for (struct addrinfo *ai = res; ai && n < 4; ai = ai->ai_next) {
+                        void *ap = NULL;
+                        if (ai->ai_family == AF_INET) ap = &((struct sockaddr_in *)ai->ai_addr)->sin_addr;
+                        else if (ai->ai_family == AF_INET6) ap = &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr;
+                        else continue;
+                        if (!inet_ntop(ai->ai_family, ap, tmp, sizeof tmp)) continue;
+                        if (!first_ip[0]) snprintf(first_ip, sizeof first_ip, "%s", tmp);
+                        off += (size_t)snprintf(iplist + off, sizeof iplist - off, "%s\"%s\"", off ? "," : "[", tmp);
+                        n++;
+                    }
+                    freeaddrinfo(res);
+                    if (off) snprintf(iplist + off, sizeof iplist - off, "]");
+                    else snprintf(iplist, sizeof iplist, "[]");
+                } else snprintf(iplist, sizeof iplist, "[]");
+            }
+            int gip = first_ip[0] ? geo_ip_is_cn(first_ip) : -1;
+            int gsite = geo_site_is_cn(host);
+            int matched = -1, upid = -1; char upname[128] = "";
+            pthread_mutex_lock(&srv->lock);
+            int rid = router_select(&srv->router, host, 80, 0, NULL);
+            for (int i = 0; i < srv->router.count; i++)
+                if (srv->router.rules[i].id == rid) { matched = rid; break; }
+            if (matched < 0 && rid >= 0) matched = rid;
+            int want_up = -1;
+            for (int i = 0; i < srv->router.count; i++)
+                if (srv->router.rules[i].id == matched) { want_up = srv->router.rules[i].upstream_id; break; }
+            if (want_up < 0 && srv->upstream_count) { want_up = srv->upstreams[0].id; }
+            for (int i = 0; i < srv->upstream_count; i++)
+                if (srv->upstreams[i].id == want_up) { upid = want_up; snprintf(upname, sizeof upname, "%s", srv->upstreams[i].name); break; }
+            pthread_mutex_unlock(&srv->lock);
+            char d[2048];
+            snprintf(d, sizeof d,
+                "{\"host\":\"%s\",\"ips\":%s,\"geoip_cn\":%s,\"geosite_cn\":%s,\"matched_rule\":%d,\"upstream\":{\"id\":%d,\"name\":\"%s\"}}",
+                host, iplist,
+                gip == 1 ? "true" : "false", gsite == 1 ? "true" : "false",
+                matched, upid, upname);
+            send_envelope(conn, 200, web_envelope_json(d, NULL, NULL));
+            return;
+        }
+        send_envelope(conn, 404, web_envelope_json(NULL, "NOT_FOUND", "unknown geo endpoint"));
         return;
     }
     if (strncmp(uri, "/api/sessions", 13) == 0) {

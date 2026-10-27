@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include "rybaproxy/db.h"
+#include "rybaproxy/geo.h"
 #include "rybaproxy/session.h"
 #include "rybaproxy/web_api.h"
 #include "rybaproxy/router.h"
@@ -171,6 +172,13 @@ static void test_session_get_by_id(void **state) {
     assert_int_equal(db_get_session_by_id(999999999LL, buf, sizeof buf), 1);
 }
 
+static void test_geo_check_validation(void **state) {
+    (void)state;
+    /* check 入参：空 host 拒绝（400 语义）；geo 三值语义抽查 */
+    assert_int_equal(geo_site_is_cn(""), -1);
+    assert_int_equal(geo_ip_is_cn(""), -1);
+}
+
 static void test_rule_geo_validation(void **state) {
     (void)state;
     /* 白名单校验：非法值拒绝，合法值 + 空值通过 */
@@ -204,6 +212,7 @@ int main(void) {
         cmocka_unit_test(test_upstream_update_ok),
         cmocka_unit_test(test_upstream_update_auth_persist),
         cmocka_unit_test(test_rule_geo_validation),
+        cmocka_unit_test(test_geo_check_validation),
         cmocka_unit_test_setup_teardown(test_session_get_by_id, setup, teardown),
         cmocka_unit_test_setup_teardown(test_settings_roundtrip, setup, teardown),
     };

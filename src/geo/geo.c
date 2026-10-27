@@ -236,6 +236,48 @@ static int parse_dat(const unsigned char *buf, size_t len, int is_ip) {
     return 0;
 }
 
+/* 数据源：开源社区维护的 GeoIP / Geosite 数据文件（换源只改这两行） */
+static const char *kGeoIpURL = "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/geoip.dat";
+static const char *kGeoSiteURL = "https://raw.githubusercontent.com/Loyalsoldier/v2ray-rules-dat/release/geosite.dat";
+
+int geo_download(const char *dir, char *err, size_t errsz) {
+    if (err && errsz) err[0] = '\0';
+    if (!dir || !*dir) { if (err && errsz) snprintf(err, errsz, "empty dir"); return -1; }
+    const char *urls[2] = { kGeoIpURL, kGeoSiteURL };
+    const char *names[2] = { "geoip.dat", "geosite.dat" };
+    for (int i = 0; i < 2; i++) {
+        char tmp[1024], dst[1024];
+        snprintf(tmp, sizeof tmp, "%s/%s.tmp", dir, names[i]);
+        snprintf(dst, sizeof dst, "%s/%s", dir, names[i]);
+        char cmd[2048];
+        snprintf(cmd, sizeof cmd, "curl -fsSL --max-time 60 -o '%s' '%s' 2>&1", tmp, urls[i]);
+        FILE *p = popen(cmd, "r");
+        if (!p) { if (err && errsz) snprintf(err, errsz, "popen failed: %s", names[i]); return -1; }
+        char msg[512] = "";
+        size_t ml = fread(msg, 1, sizeof msg - 1, p);
+        msg[ml] = '\0';
+        int rc = pclose(p);
+        if (rc != 0) {
+            remove(tmp);
+            if (err && errsz) snprintf(err, errsz, "download %s failed: %s", names[i], msg);
+            return -1;
+        }
+        struct stat st;
+        if (stat(tmp, &st) != 0 || st.st_size < 1024) {
+            remove(tmp);
+            if (err && errsz) snprintf(err, errsz, "%s too small, aborted", names[i]);
+            return -1;
+        }
+        if (rename(tmp, dst) != 0) {
+            remove(tmp);
+            if (err && errsz) snprintf(err, errsz, "rename %s failed", names[i]);
+            return -1;
+        }
+    }
+    if (geo_load(dir) != 0) { if (err && errsz) snprintf(err, errsz, "parse failed"); return -1; }
+    return 0;
+}
+
 static unsigned char *read_file(const char *path, size_t *out_len) {
     FILE *f = fopen(path, "rb");
     if (!f) return NULL;

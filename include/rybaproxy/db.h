@@ -18,5 +18,7 @@ int db_stats_top(const char *by, int limit, long long from_ms, long long to_ms, 
 int db_settings_get(char *buf, size_t bufsz);
 int db_settings_set(const char *key, const char *value);
 int db_exec_raw(const char *sql);
+/* db 文件所在目录（geo dat 落盘用）；失败返回-1 */
+int db_get_dir(char *out, size_t outsz);
 
 #endif
