@@ -31,6 +31,41 @@ if(RYBA_ENABLE_COVERAGE)
     add_link_options(--coverage)
 endif()
 
+# ---- 版本号：VERSION 文件为准，git describe 补 commit/构建时间 ----
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" RYBA_VERSION_RAW)
+string(STRIP "${RYBA_VERSION_RAW}" RYBA_VERSION)
+
+find_program(RYBA_GIT_EXECUTABLE git)
+set(RYBA_GIT_COMMIT "unknown")
+set(RYBA_VERSION_FULL "${RYBA_VERSION}")
+if(RYBA_GIT_EXECUTABLE)
+    execute_process(
+        COMMAND "${RYBA_GIT_EXECUTABLE}" -C "${CMAKE_CURRENT_SOURCE_DIR}" rev-parse --short HEAD
+        OUTPUT_VARIABLE RYBA_GIT_COMMIT_OUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE RYBA_GIT_RC)
+    if(RYBA_GIT_RC EQUAL 0 AND RYBA_GIT_COMMIT_OUT)
+        set(RYBA_GIT_COMMIT "${RYBA_GIT_COMMIT_OUT}")
+    endif()
+    execute_process(
+        COMMAND "${RYBA_GIT_EXECUTABLE}" -C "${CMAKE_CURRENT_SOURCE_DIR}" describe --tags --dirty --always
+        OUTPUT_VARIABLE RYBA_DESCRIBE_OUT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+        ERROR_QUIET
+        RESULT_VARIABLE RYBA_DESCRIBE_RC)
+    if(RYBA_DESCRIBE_RC EQUAL 0 AND RYBA_DESCRIBE_OUT)
+        set(RYBA_VERSION_FULL "${RYBA_DESCRIBE_OUT}")
+    endif()
+endif()
+string(TIMESTAMP RYBA_BUILD_TIME "%Y-%m-%dT%H:%M:%S" UTC)
+message(STATUS "rybaproxy version: ${RYBA_VERSION_FULL} (commit ${RYBA_GIT_COMMIT})")
+
+configure_file(
+    "${CMAKE_CURRENT_SOURCE_DIR}/include/rybaproxy/version.h.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/generated/rybaproxy/version.h"
+    @ONLY)
+
 find_package(PkgConfig QUIET)
 # Dependencies via vcpkg
 find_package(Libevent CONFIG REQUIRED)
@@ -55,6 +90,7 @@ endforeach()
 add_library(rybaproxy_core STATIC ${RYBA_SRCS})
 target_include_directories(rybaproxy_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_BINARY_DIR}/generated
     ${CMAKE_CURRENT_SOURCE_DIR}/third_party)
 target_link_libraries(rybaproxy_core PUBLIC
     libevent::core libevent::extra libevent::pthreads

@@ -1,0 +1,124 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CMAKE_BUILD_TYPE: Release
+
+jobs:
+  build-test:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x86_64
+            triplet: x64-linux
+          - os: macos-14
+            target: macos-arm64
+            triplet: arm64-osx
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # git describe 要完整历史，否则版本号只有 commit hash
+          fetch-depth: 0
+
+      - name: Set up vcpkg
+        shell: bash
+        run: |
+          git clone --depth 1 --branch 2025.09.30 https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
+          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
+          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
+
+      # 依赖编译一次要十几分钟：二进制缓存 + installed 树都按 vcpkg.json 指纹缓存
+      - name: Cache vcpkg
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/vcpkg/archives
+            ${{ github.workspace }}/vcpkg_installed
+          key: vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
+          restore-keys: |
+            vcpkg-${{ runner.os }}-${{ matrix.triplet }}-
+
+      - name: Show version
+        shell: bash
+        run: |
+          echo "version=$(git describe --tags --dirty --always)" >> "$GITHUB_ENV"
+          echo "commit=$(git rev-parse --short HEAD)" >> "$GITHUB_ENV"
+          git describe --tags --dirty --always
+
+      - name: Configure
+        shell: bash
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_TOOLCHAIN_FILE="$VCPKG_ROOT/scripts/buildsystems/vcpkg.cmake" \
+            -DVCPKG_TARGET_TRIPLET=${{ matrix.triplet }} \
+            -DCMAKE_BUILD_TYPE="$CMAKE_BUILD_TYPE"
+
+      - name: Build
+        shell: bash
+        run: cmake --build build -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
+
+      - name: Test
+        shell: bash
+        run: ctest --test-dir build --output-on-failure
+
+      # -v 的版本必须等于 git describe，防止版本注入失效还在发版
+      - name: Verify version wiring
+        shell: bash
+        run: |
+          ./build/rybaproxy -v
+          # -v 的版本串必须等于 git describe；二进制里必须能搜到 VERSION 文件的 semver
+          ./build/rybaproxy -v | grep -F "$version"
+          strings build/rybaproxy | grep -F "$(cat VERSION)"
+
+      - name: Package
+        shell: bash
+        run: |
+          mkdir -p dist
+          cp build/rybaproxy "dist/rybaproxy-$version-${{ matrix.target }}"
+          (cd dist && shasum -a 256 "rybaproxy-$version-${{ matrix.target }}" > "rybaproxy-$version-${{ matrix.target }}.sha256")
+          ls -la dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: rybaproxy-${{ matrix.target }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    name: release
+    needs: build-test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Assets
+        shell: bash
+        run: ls -laR dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          fail_on_unmatched_files: true
+          generate_release_notes: true

@@ -1,0 +1,10 @@
+/* 构建期生成，请勿手改。由 CMake 从 git describe / VERSION 文件注入。 */
+#ifndef RYBAPROXY_VERSION_H
+#define RYBAPROXY_VERSION_H
+
+#define RYBA_VERSION      "@RYBA_VERSION@"
+#define RYBA_VERSION_FULL "@RYBA_VERSION_FULL@"
+#define RYBA_GIT_COMMIT   "@RYBA_GIT_COMMIT@"
+#define RYBA_BUILD_TIME   "@RYBA_BUILD_TIME@"
+
+#endif

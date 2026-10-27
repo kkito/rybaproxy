@@ -6,6 +6,7 @@
 #include "rybaproxy/db.h"
 #include "rybaproxy/geo.h"
 #include "rybaproxy/web.h"
+#include "rybaproxy/version.h"
 
 #include <signal.h>
 #include <stdio.h>
@@ -29,7 +30,7 @@ int main(int argc, char **argv) {
         if (strcmp(argv[i], "-c") == 0 && i + 1 < argc) {
             config_path = argv[++i];
         } else if (strcmp(argv[i], "-v") == 0) {
-            printf("rybaproxy 0.1.0\n");
+            printf("rybaproxy %s (commit %s, built %s)\n", RYBA_VERSION_FULL, RYBA_GIT_COMMIT, RYBA_BUILD_TIME);
             return 0;
         }
     }

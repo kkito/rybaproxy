@@ -16,9 +16,8 @@
 #include <sys/stat.h>
 #include <time.h>
 
-#ifndef RYBA_VERSION
-#define RYBA_VERSION "0.1.0"
-#endif
+/* 版本号由构建期生成的 version.h 注入（git describe / VERSION 文件） */
+#include "rybaproxy/version.h"
 
 char *web_envelope_json(const char *data_json, const char *err_code, const char *err_msg) {
     if (err_code) {

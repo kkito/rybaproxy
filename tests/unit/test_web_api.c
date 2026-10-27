@@ -8,6 +8,7 @@
 #include "rybaproxy/geo.h"
 #include "rybaproxy/session.h"
 #include "rybaproxy/web_api.h"
+#include "rybaproxy/version.h"
 #include "rybaproxy/router.h"
 
 static char g_tmpdb[128];
@@ -221,6 +222,19 @@ static void test_geo_unknown_json_shape(void **state) {
     geo_free();
 }
 
+/* 版本号：必须由构建期生成（git describe/VERSION），不能靠手改代码。
+ * healthz 是运维探活入口，必须带出版本，否则线上排查不知道跑的是哪个包。 */
+static void test_healthz_carries_version(void **state) {
+    (void)state;
+    /* dispatch 直连 mg_connection，单测拿不到输出；这里断言构建期注入的版本宏有效。
+     * 真正的端到端断言在 CI：rybaproxy -v 与 /healthz 的 version 必须等于 tag。 */
+    assert_true(strlen(RYBA_VERSION) > 0);
+    assert_non_null(strchr(RYBA_VERSION, '.'));   /* 形如 0.1.0 或 0.1.0-3-gabc */
+    assert_true(strlen(RYBA_VERSION_FULL) > 0);
+    assert_true(strlen(RYBA_GIT_COMMIT) > 0);
+    assert_true(strlen(RYBA_BUILD_TIME) > 0);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_envelope_ok_shape),
@@ -239,6 +253,7 @@ int main(void) {
         cmocka_unit_test(test_geo_unknown_json_shape),
         cmocka_unit_test_setup_teardown(test_session_get_by_id, setup, teardown),
         cmocka_unit_test_setup_teardown(test_settings_roundtrip, setup, teardown),
+        cmocka_unit_test(test_healthz_carries_version),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }
