@@ -41,6 +41,9 @@ void config_init_defaults(config_t *c) {
     strcpy(c->default_upstream, "direct");
     ryba_default_db_path(getenv("HOME"), c->db_path, sizeof c->db_path);
     c->geo_dir[0] = '\0';
+    ryba_default_log_path(getenv("HOME"), c->log_file, sizeof c->log_file);
+    snprintf(c->log_level, sizeof c->log_level, "info");
+    c->geo_cache_size = 512;
     c->retention_days = 90;
 }
 
@@ -98,10 +101,20 @@ int config_load(const char *path, config_t *c) {
     if (cJSON_IsObject(stats)) {
         copy_str(c->db_path, sizeof c->db_path, stats, "db_path");
         copy_str(c->geo_dir, sizeof c->geo_dir, stats, "geo_dir");
+        copy_str(c->log_file, sizeof c->log_file, stats, "log_file");
+        copy_str(c->log_level, sizeof c->log_level, stats, "log_level");
+        int n = get_int(stats, "geo_cache_size", c->geo_cache_size);
+        c->geo_cache_size = n < 0 ? 0 : (n > 4096 ? 4096 : n);
         c->retention_days = get_int(stats, "retention_days", c->retention_days);
     }
-    /* 兼容：顶层 geo_dir 也接受 */
+    /* 兼容：顶层 geo_dir / log_file / log_level 也接受 */
     copy_str(c->geo_dir, sizeof c->geo_dir, root, "geo_dir");
+    copy_str(c->log_file, sizeof c->log_file, root, "log_file");
+    copy_str(c->log_level, sizeof c->log_level, root, "log_level");
+    {
+        int n = get_int(root, "geo_cache_size", c->geo_cache_size);
+        c->geo_cache_size = n < 0 ? 0 : (n > 4096 ? 4096 : n);
+    }
 
     const cJSON *ups = cJSON_GetObjectItemCaseSensitive(root, "upstreams");
     if (cJSON_IsArray(ups)) {

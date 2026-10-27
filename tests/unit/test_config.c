@@ -23,7 +23,7 @@ static void test_config_defaults_data_dir(void **state) {
     const char *home = getenv("HOME");
     if (home && *home) {
         char expect[300];
-        snprintf(expect, sizeof expect, "%s/.local/rybaproxy/stats.db", home);
+        snprintf(expect, sizeof expect, "%s/.local/rybaproxy/rybaproxy.db", home);
         assert_string_equal(c.db_path, expect);
     }
     assert_string_equal(c.geo_dir, "");
@@ -58,12 +58,30 @@ static void test_config_load(void **state) {
     remove(path);
 }
 
+static void test_config_defaults_db_log_cache(void **s) {
+    (void)s;
+    /* RED: 默认 db/log 路径 + geo_cache_size(512) */
+    config_t c;
+    config_init_defaults(&c);
+    const char *home = getenv("HOME");
+    if (home && *home) {
+        char expect[600];
+        snprintf(expect, sizeof expect, "%s/.local/rybaproxy/rybaproxy.db", home);
+        assert_string_equal(c.db_path, expect);
+        snprintf(expect, sizeof expect, "%s/.local/rybaproxy/rybaproxy.log", home);
+        assert_string_equal(c.log_file, expect);
+    }
+    assert_string_equal(c.log_level, "info");
+    assert_int_equal(c.geo_cache_size, 512);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_config_defaults),
         cmocka_unit_test(test_config_defaults_data_dir),
         cmocka_unit_test(test_config_load_geo_dir),
         cmocka_unit_test(test_config_load),
+        cmocka_unit_test(test_config_defaults_db_log_cache),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

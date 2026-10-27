@@ -23,6 +23,9 @@ typedef struct {
     bool resolve_for_routing;
     char db_path[512];
     char geo_dir[512];
+    char log_file[512];
+    char log_level[16];
+    int geo_cache_size;
     int retention_days;
     upstream_profile_t *upstreams;
     int upstream_count;
