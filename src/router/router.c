@@ -57,12 +57,14 @@ static int rule_matches(const rule_t *rule, const char *host, int port, protocol
     }
     if (rule->geo_ip[0]) {
         int cn = geo_host_is_cn(host);
+        if (cn < 0) return 0; /* 空库未知：不许匹配 cn/!cn 任一，一律走默认 */
         if (strcmp(rule->geo_ip, "cn") == 0 && cn != 1) return 0;
         else if (strcmp(rule->geo_ip, "!cn") == 0 && cn == 1) return 0;
         else if (rule->geo_ip[0] && strcmp(rule->geo_ip, "cn") != 0 && strcmp(rule->geo_ip, "!cn") != 0) return 0;
     }
     if (rule->geo_site[0]) {
         int cn = geo_site_is_cn(host);
+        if (cn < 0) return 0; /* 空库未知：不许匹配 cn/!cn 任一，一律走默认 */
         if (strcmp(rule->geo_site, "cn") == 0 && cn != 1) return 0;
         else if (strcmp(rule->geo_site, "!cn") == 0 && cn == 1) return 0;
         else if (rule->geo_site[0] && strcmp(rule->geo_site, "cn") != 0 && strcmp(rule->geo_site, "!cn") != 0) return 0;

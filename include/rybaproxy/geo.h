@@ -24,5 +24,7 @@ size_t geo_ip_count(void);
 size_t geo_site_count(void);
 /* 下载 dat 到 dir（tmp+rename 原子落盘，成功后 geo_load）；失败 err 写原因 */
 int geo_download(const char *dir, char *err, size_t errsz);
+/* 测试钩子：清表+清DNS缓存+loaded=0 */
+void geo_test_reset(void);
 
 #endif

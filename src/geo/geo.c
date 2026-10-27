@@ -343,11 +343,15 @@ static unsigned char *read_file(const char *path, size_t *out_len) {
 
 static int g_loaded = 0;
 
+/* DNS 缓存前向声明（定义在文件后部，free/reset 需先用） */
+static void dns_cache_clear(void);
+
 int geo_init(void) { return 0; }
 
 void geo_free(void) {
     pthread_mutex_lock(&g_lock);
     geo_tables_clear();
+    dns_cache_clear();
     g_loaded = 0;
     pthread_mutex_unlock(&g_lock);
 }
@@ -367,6 +371,14 @@ int geo_db_loaded(void) { return g_loaded; }
 const char *geo_ip_url(void) { return geo_env_or("RYBA_GEOIP_URL", kGeoIpURL); }
 const char *geo_site_url(void) { return geo_env_or("RYBA_GEOSITE_URL", kGeoSiteURL); }
 const char *geo_proxy(void) { const char *p = getenv("RYBA_GEO_PROXY"); return (p && *p) ? p : NULL; }
+/* 测试钩子：清表 + 清 DNS 缓存 + loaded=0（空库语义回归用） */
+void geo_test_reset(void) {
+    pthread_mutex_lock(&g_lock);
+    geo_tables_clear();
+    dns_cache_clear();
+    g_loaded = 0;
+    pthread_mutex_unlock(&g_lock);
+}
 size_t geo_ip_count(void) { return g_cidr_n; }
 size_t geo_site_count(void) { return g_suffix_n + g_exact_n + g_re_n; }
 
@@ -417,6 +429,7 @@ int geo_ip_is_cn(const char *ip) {
     norm_key(raw, is6, key);
     if (is_private_ip(is6 ? raw : raw, is6)) return 1;
     pthread_mutex_lock(&g_lock);
+    if (!g_loaded) { pthread_mutex_unlock(&g_lock); return -1; } /* 空库报未知，不许报非CN */
     int hit = 0;
     for (size_t i = 0; i < g_cidr_n; i++) {
         if (match_cidr6(key, &g_cidrs[i])) { hit = 1; break; }
@@ -428,15 +441,17 @@ int geo_ip_is_cn(const char *ip) {
 int geo_site_is_cn(const char *host) {
     if (!host || !*host) return -1;
     struct in_addr a4; struct in6_addr a6;
-    if (inet_pton(AF_INET, host, &a4) == 1 || inet_pton(AF_INET6, host, &a6) == 1) return 0;
+    int is_lit = (inet_pton(AF_INET, host, &a4) == 1 || inet_pton(AF_INET6, host, &a6) == 1);
+    pthread_mutex_lock(&g_lock);
+    if (!g_loaded) { pthread_mutex_unlock(&g_lock); return -1; } /* 空库报未知，不许报非CN */
+    if (is_lit) { pthread_mutex_unlock(&g_lock); return 0; } /* IP 字面量无域名可查 */
+    int hit = 0;
     char low[256];
     size_t L = strlen(host);
-    if (L >= sizeof low) return -1;
+    if (L >= sizeof low) { pthread_mutex_unlock(&g_lock); return -1; }
     for (size_t i = 0; i <= L; i++) low[i] = (char)tolower((unsigned char)host[i]);
     while (L && low[L - 1] == '.') low[--L] = '\0';
-    if (!L) return -1;
-    pthread_mutex_lock(&g_lock);
-    int hit = 0;
+    if (!L) { pthread_mutex_unlock(&g_lock); return -1; }
     for (size_t i = 0; i < g_exact_n && !hit; i++)
         if (strcmp(low, g_exact[i]) == 0) hit = 1;
     if (!hit) {
@@ -464,6 +479,11 @@ int geo_site_is_cn(const char *host) {
 typedef struct { char host[128]; char ip[64]; int cn; time_t ts; } dns_ent_t;
 static dns_ent_t g_dns[GEO_DNS_CAP];
 static int g_dns_pos = 0;
+
+static void dns_cache_clear(void) {
+    memset(g_dns, 0, sizeof g_dns);
+    g_dns_pos = 0;
+}
 
 int geo_host_is_cn(const char *host) {
     if (!host || !*host) return -1;

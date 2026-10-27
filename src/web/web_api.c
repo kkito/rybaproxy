@@ -635,9 +635,11 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             pthread_mutex_unlock(&srv->lock);
             char d[2048];
             snprintf(d, sizeof d,
-                "{\"host\":\"%s\",\"ips\":%s,\"geoip_cn\":%s,\"geosite_cn\":%s,\"matched_rule\":%d,\"upstream\":{\"id\":%d,\"name\":\"%s\"}}",
+                "{\"host\":\"%s\",\"ips\":%s,\"geoip_cn\":%s,\"geosite_cn\":%s,\"db_loaded\":%s,\"matched_rule\":%d,\"upstream\":{\"id\":%d,\"name\":\"%s\"}}",
                 host, iplist,
-                gip == 1 ? "true" : "false", gsite == 1 ? "true" : "false",
+                gip < 0 ? "null" : (gip == 1 ? "true" : "false"),
+                gsite < 0 ? "null" : (gsite == 1 ? "true" : "false"),
+                geo_db_loaded() ? "true" : "false",
                 matched, upid, upname);
             send_envelope(conn, 200, web_envelope_json(d, NULL, NULL));
             return;

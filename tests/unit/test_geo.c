@@ -76,8 +76,14 @@ static void test_invalid_input(void **s) {
 
 static void test_db_unloaded(void **s) {
     (void)s;
+    /* 空库必须报未知(-1)，不许撒谎报非CN(0)：baidu 误判根因 */
     assert_int_equal(geo_db_loaded(), 0);
-    assert_int_equal(geo_ip_is_cn("8.8.8.8"), 0); /* 无 dat：未知按非CN */
+    assert_int_equal(geo_ip_is_cn("8.8.8.8"), -1);
+    assert_int_equal(geo_ip_is_cn("110.242.69.21"), -1);
+    assert_int_equal(geo_site_is_cn("www.baidu.com"), -1);
+    assert_int_equal(geo_host_is_cn("www.baidu.com"), -1);
+    /* 私网不依赖 dat，仍判 CN */
+    assert_int_equal(geo_ip_is_cn("192.168.1.1"), 1);
 }
 
 static void test_load_wire_dat(void **s) {

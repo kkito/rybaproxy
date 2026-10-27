@@ -123,6 +123,38 @@ static void test_rule_geo_site_cn(void **s) {
     assert_int_equal(router_select(&r, "a.example.com", 80, PROTO_HTTP, NULL), -1);
     router_free(&r);
 }
+static void test_rule_geo_empty_db_no_match(void **s) {
+    (void)s;
+    /* 空库红线：未知(-1)不许匹配任何 geo 条件，一律走默认(-1)，不许按!cn分流 */
+    extern void geo_test_reset(void);
+    geo_test_reset(); /* 测试钩子：清表+清DNS缓存，保证本用例真是空库（cmocka同进程串行，前序dat残留必须清） */
+    geo_init();
+    assert_int_equal(geo_db_loaded(), 0);
+    router_t r; router_init(&r, "direct", 1);
+    rule_t rule = {0}; rule.id=1; rule.priority=100; rule.enabled=1;
+    strcpy(rule.geo_ip, "cn"); rule.upstream_id=5;
+    router_add_rule(&r, &rule);
+    rule_t rule2 = {0}; rule2.id=2; rule2.priority=100; rule2.enabled=1;
+    strcpy(rule2.geo_ip, "!cn"); rule2.upstream_id=6;
+    router_add_rule(&r, &rule2);
+    rule_t rule3 = {0}; rule3.id=3; rule3.priority=100; rule3.enabled=1;
+    strcpy(rule3.geo_site, "cn"); rule3.upstream_id=7;
+    router_add_rule(&r, &rule3);
+    rule_t rule4 = {0}; rule4.id=4; rule4.priority=100; rule4.enabled=1;
+    strcpy(rule4.geo_site, "!cn"); rule4.upstream_id=8;
+    router_add_rule(&r, &rule4);
+    /* IP 字面量不碰 DNS：空库未知一律走默认 */
+    assert_int_equal(router_select(&r, "1.2.3.9", 80, PROTO_HTTP, NULL), -1);
+    assert_int_equal(router_select(&r, "8.8.8.8", 80, PROTO_HTTP, NULL), -1);
+    /* 域名 geo_site 纯查表不碰 DNS：空库同样走默认 */
+    router_t r2; router_init(&r2, "direct", 1);
+    router_add_rule(&r2, &rule3);
+    router_add_rule(&r2, &rule4);
+    assert_int_equal(router_select(&r2, "www.baidu.com", 80, PROTO_HTTP, NULL), -1);
+    router_free(&r2);
+    router_free(&r);
+    geo_free();
+}
 static void test_rule_geo_and_domain(void **s) {
     (void)s;
     router_t r; router_init(&r, "direct", 1);
@@ -144,6 +176,7 @@ int main(void) {
         cmocka_unit_test_setup_teardown(test_rule_geo_ip_cn, geo_setup, geo_teardown),
         cmocka_unit_test_setup_teardown(test_rule_geo_ip_neg, geo_setup, geo_teardown),
         cmocka_unit_test_setup_teardown(test_rule_geo_site_cn, geo_setup, geo_teardown),
+        cmocka_unit_test(test_rule_geo_empty_db_no_match),
         cmocka_unit_test_setup_teardown(test_rule_geo_and_domain, geo_setup, geo_teardown),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);

@@ -60,6 +60,9 @@ static void test_page_geo_hooks_tail(void **state) {
     /* 旧 number 手填框已移除，出口是下拉；管理卡展示下载源/目录 */
     assert_true(strstr(WEB_PAGE_HTML, "name=\"upstream_id\" type=\"number\"") == NULL);
     assert_true(strstr(WEB_PAGE_HTML, "geoSrc") != NULL);
+    /* 空库语义：未知显示 cnText + 未加载提示，不许再撒谎报非CN */
+    assert_true(strstr(WEB_PAGE_HTML, "cnText") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML, "库未加载") != NULL);
 }
 
 int main(void) {

@@ -209,6 +209,16 @@ static void test_settings_roundtrip(void **state) {
     free(s);
 }
 
+static void test_geo_unknown_json_shape(void **state) {
+    (void)state;
+    /* 空库 /api/geo/check 语义：未知输出 null（不是 false），页面据此报“库未加载” */
+    geo_test_reset();
+    assert_int_equal(geo_ip_is_cn("110.242.69.21"), -1);
+    assert_int_equal(geo_site_is_cn("www.baidu.com"), -1);
+    assert_int_equal(geo_host_is_cn("1.2.3.9"), -1);
+    geo_free();
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_envelope_ok_shape),
@@ -224,6 +234,7 @@ int main(void) {
         cmocka_unit_test(test_rule_geo_validation),
         cmocka_unit_test(test_geo_check_validation),
         cmocka_unit_test(test_geo_url_override),
+        cmocka_unit_test(test_geo_unknown_json_shape),
         cmocka_unit_test_setup_teardown(test_session_get_by_id, setup, teardown),
         cmocka_unit_test_setup_teardown(test_settings_roundtrip, setup, teardown),
     };
