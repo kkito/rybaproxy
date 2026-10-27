@@ -29,29 +29,25 @@ jobs:
           - os: macos-14
             target: macos-arm64
             triplet: arm64-osx
+    env:
+      # vcpkg 固定版本（tag 2026.10.16 解引用的 commit），保证依赖可复现
+      VCPKG_COMMIT_ID: 9eec002df1cd109f8f104cd966a763daf9751489
     steps:
       - uses: actions/checkout@v4
         with:
           # git describe 要完整历史，否则版本号只有 commit hash
           fetch-depth: 0
 
+      # vcpkg 由 run-vcpkg 拉取并写入 GH Actions 缓存（含二进制缓存），
+      # 不需要自己配 actions/cache——它内部用 VCPKG_BINARY_SOURCES 接管。
+      # doNotCache 默认 true（跳过缓存），必须显式关掉。
       - name: Set up vcpkg
-        shell: bash
-        run: |
-          git clone --depth 1 --branch 2025.09.30 https://github.com/microsoft/vcpkg.git "$RUNNER_TEMP/vcpkg"
-          "$RUNNER_TEMP/vcpkg/bootstrap-vcpkg.sh" -disableMetrics
-          echo "VCPKG_ROOT=$RUNNER_TEMP/vcpkg" >> "$GITHUB_ENV"
-
-      # 依赖编译一次要十几分钟：二进制缓存 + installed 树都按 vcpkg.json 指纹缓存
-      - name: Cache vcpkg
-        uses: actions/cache@v4
+        uses: lukka/run-vcpkg@v11
         with:
-          path: |
-            ~/.cache/vcpkg/archives
-            ${{ github.workspace }}/vcpkg_installed
-          key: vcpkg-${{ runner.os }}-${{ matrix.triplet }}-${{ hashFiles('vcpkg.json') }}
-          restore-keys: |
-            vcpkg-${{ runner.os }}-${{ matrix.triplet }}-
+          vcpkgGitCommitId: ${{ env.VCPKG_COMMIT_ID }}
+          vcpkgJsonGlob: '**/vcpkg.json'
+          runVcpkgInstall: true
+          doNotCache: false
 
       - name: Show version
         shell: bash
