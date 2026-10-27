@@ -172,6 +172,25 @@ int upstream_connect_socks5(const upstream_profile_t *up, const char *target_hos
 
 #include <time.h>
 
+/* 路由结果 → 上游下标（纯函数，无 IO）。
+ * route_id >= 0：按 id 找启用项；找不到回落 direct；再找不到 -1。
+ * route_id < 0（无规则命中）：按 default_name 找，空名取第一个启用项，回落 direct。 */
+int upstream_pick(const upstream_profile_t *ups, int n, const char *default_name, int route_id) {
+    if (!ups || n <= 0) return -1;
+    if (route_id >= 0) {
+        for (int i = 0; i < n; i++)
+            if (ups[i].enabled && ups[i].id == route_id) return i;
+    } else if (default_name && default_name[0]) {
+        for (int i = 0; i < n; i++)
+            if (ups[i].enabled && strcmp(ups[i].name, default_name) == 0) return i;
+    } else {
+        for (int i = 0; i < n; i++) if (ups[i].enabled) return i;
+    }
+    for (int i = 0; i < n; i++)
+        if (ups[i].enabled && ups[i].type == UPSTREAM_DIRECT) return i;
+    return -1;
+}
+
 int upstream_test_reachable(const upstream_profile_t *up, int timeout_ms, long *latency_ms_out) {
     if (latency_ms_out) *latency_ms_out = -1;
     if (!up) return -1;

@@ -91,6 +91,28 @@ static int ensure_direct(server_ctx_t *ctx) {
     return 0;
 }
 
+/* 薄胶水：direct 上游，没有就补建（原来三处重复） */
+static upstream_profile_t *direct_upstream(server_ctx_t *srv) {
+    upstream_profile_t *d = find_upstream_by_name(srv, "direct");
+    if (!d) { ensure_direct(srv); d = find_upstream_by_name(srv, "direct"); }
+    return d;
+}
+
+/* 薄胶水：路由选择 + 上游落地。判定全在纯函数 upstream_pick 里，
+ * 这里只做「补建 direct」这一件有副作用的事。 */
+static upstream_profile_t *pick_upstream(server_ctx_t *srv, const char *host, uint16_t port,
+                                         protocol_t proto, const char *client_ip) {
+    int route_id = router_select(&srv->router, host, port, proto, client_ip);
+    int idx = upstream_pick(srv->upstreams, srv->upstream_count,
+                            srv->config.default_upstream, route_id);
+    if (idx < 0) {
+        ensure_direct(srv);
+        idx = upstream_pick(srv->upstreams, srv->upstream_count,
+                            srv->config.default_upstream, route_id);
+    }
+    return idx < 0 ? NULL : &srv->upstreams[idx];
+}
+
 static int upstream_connect_profile(upstream_profile_t *up, const char *host, uint16_t port, int *fd) {
     if (!up) return -1;
     if (up->type == UPSTREAM_DIRECT) return upstream_connect_direct(host, port, fd);
@@ -179,25 +201,25 @@ static void http_read_cb(struct bufferevent *bev, void *arg) {
         }
 
         /* routing */
-        int up_id = router_select(&srv->router, info.host, info.port, PROTO_HTTP, s->client_ip);
-        if (up_id < 0) {
-            /* default by name */
-            upstream_profile_t *def = find_upstream_by_name(srv, srv->config.default_upstream);
-            up_id = def ? def->id : 0;
+        upstream_profile_t *up = pick_upstream(srv, info.host, info.port, PROTO_HTTP, s->client_ip);
+        if (!up) {
+            { const char *r="HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
+            http_finish(c, 0);
+            return;
         }
-        upstream_profile_t *up = find_upstream_by_id(srv, up_id);
-        if (!up) up = find_upstream_by_name(srv, "direct");
-        if (!up) { ensure_direct(srv); up = find_upstream_by_name(srv, "direct"); }
+        /* 先记下决定走的上游：连接失败时统计的也是真实尝试过的线路，
+         * 而不是 upstream_id 初值 0（会被 find_upstream_by_id(0) 错记成第一个上游） */
+        s->upstream_id = up->id;
 
         /* connect */
         int fd = -1;
         if (upstream_connect_profile(up, info.host, info.port, &fd) != 0) {
-            upstream_profile_t *fallback = NULL;
-            if (srv->config.fallback_to_direct && up && up->type != UPSTREAM_DIRECT) {
-                fallback = find_upstream_by_name(srv, "direct");
-                if (!fallback) { ensure_direct(srv); fallback = find_upstream_by_name(srv, "direct"); }
-                if (fallback) upstream_connect_profile(fallback, info.host, info.port, &fd);
-                up = fallback ? fallback : up;
+            if (srv->config.fallback_to_direct && up->type != UPSTREAM_DIRECT) {
+                upstream_profile_t *fb = direct_upstream(srv);
+                if (fb && upstream_connect_profile(fb, info.host, info.port, &fd) == 0) {
+                    up = fb;
+                    s->upstream_id = fb->id;
+                }
             }
         }
         if (fd < 0) {
@@ -208,7 +230,6 @@ static void http_read_cb(struct bufferevent *bev, void *arg) {
         set_nonblock(fd);
         struct bufferevent *bev_up = bufferevent_socket_new(srv->base, fd, BEV_OPT_CLOSE_ON_FREE);
         s->bev_upstream = bev_up;
-        s->upstream_id = up ? up->id : 0;
 
         struct evbuffer *in2 = bufferevent_get_input(bev);
         struct evbuffer *up_out = bufferevent_get_output(bev_up);
@@ -354,21 +375,26 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
         session_set_target(s, host, port);
         snprintf(s->method, sizeof s->method, "SOCKS5-CONNECT");
 
-        int up_id = router_select(&srv->router, host, port, PROTO_SOCKS5, s->client_ip);
-        if (up_id < 0) {
-            upstream_profile_t *def = find_upstream_by_name(srv, srv->config.default_upstream);
-            up_id = def ? def->id : 0;
+        upstream_profile_t *up = pick_upstream(srv, host, port, PROTO_SOCKS5, s->client_ip);
+        if (!up) {
+            unsigned char r[10];
+            socks5_build_reply(r, SOCKS5_REP_FAILURE);
+            socks_send(bev, r, 10);
+            free(data);
+            http_finish((conn_t*)c, 0);
+            return;
         }
-        upstream_profile_t *up = find_upstream_by_id(srv, up_id);
-        if (!up) { ensure_direct(srv); up = find_upstream_by_name(srv, "direct"); }
+        /* 同 HTTP 路径：先记，失败时统计不错报 */
+        s->upstream_id = up->id;
 
         int fd = -1;
         if (upstream_connect_profile(up, host, port, &fd) != 0) {
-            if (srv->config.fallback_to_direct && up && up->type != UPSTREAM_DIRECT) {
-                upstream_profile_t *fb = find_upstream_by_name(srv, "direct");
-                if (!fb) { ensure_direct(srv); fb = find_upstream_by_name(srv, "direct"); }
-                if (fb) upstream_connect_profile(fb, host, port, &fd);
-                up = fb ? fb : up;
+            if (srv->config.fallback_to_direct && up->type != UPSTREAM_DIRECT) {
+                upstream_profile_t *fb = direct_upstream(srv);
+                if (fb && upstream_connect_profile(fb, host, port, &fd) == 0) {
+                    up = fb;
+                    s->upstream_id = fb->id;
+                }
             }
         }
         if (fd < 0) {
@@ -382,7 +408,6 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
         set_nonblock(fd);
         struct bufferevent *bev_up = bufferevent_socket_new(srv->base, fd, BEV_OPT_CLOSE_ON_FREE);
         s->bev_upstream = bev_up;
-        s->upstream_id = up ? up->id : 0;
 
         unsigned char r[10];
         socks5_build_reply(r, SOCKS5_REP_SUCCESS);

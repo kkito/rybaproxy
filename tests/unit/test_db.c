@@ -78,6 +78,41 @@ static void rm_db(const char *path) {
     snprintf(tmp, sizeof tmp, "%s-journal", path); remove(tmp);
 }
 
+/* 重启后 session_create 的 next_id 从 1 重来，与库里已有行主键冲突。
+ * 旧实现显式插 id，冲突行被 sqlite 静默丢弃 → 重启后会话全丢。 */
+static void test_db_session_id_reuse_not_dropped(void **state) {
+    (void)state;
+    char path[128];
+    snprintf(path, sizeof path, "/tmp/ryba_db_idreuse_%d.db", (int)getpid());
+    rm_db(path);
+    assert_int_equal(db_init(path), 0);
+    db_start();
+    struct event_base *base = event_base_new();
+    session_t *s = session_create(base, PROTO_HTTP, "127.0.0.1");
+    session_set_target(s, "idreuse.example", 80);
+    session_set_method(s, "GET");
+    session_finish(s, SESS_DONE, 0, NULL);
+    db_enqueue_session(s, "direct");
+    db_stop();
+
+    /* 模拟进程重启：同一个 id 再来一次（重启后 next_id 必然重新从 1 开始） */
+    assert_int_equal(db_init(path), 0);
+    db_start();
+    db_enqueue_session(s, "direct");
+    db_stop();
+
+    assert_int_equal(db_init(path), 0);
+    char buf[8192];
+    assert_int_equal(db_get_recent_sessions(10, buf, sizeof buf), 0);
+    session_destroy(s); event_base_free(base);
+    db_stop();
+    rm_db(path);
+
+    int hits = 0;
+    for (const char *p = buf; (p = strstr(p, "idreuse.example")) != NULL; p++) hits++;
+    assert_int_equal(hits, 2);
+}
+
 static void test_db_filter_pagination(void **state) {
     (void)state;
     char path[128];
@@ -248,6 +283,7 @@ int main(void) {
         cmocka_unit_test(test_db_rules_geo_roundtrip),
         cmocka_unit_test(test_db_has_geo_tables),
         cmocka_unit_test(test_db_nested_path_autocreate),
+        cmocka_unit_test(test_db_session_id_reuse_not_dropped),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

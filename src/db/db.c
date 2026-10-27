@@ -130,9 +130,10 @@ int db_init(const char *path) {
     /* schema version */
     sqlite3_exec(g_db, "INSERT INTO schema_version(version) SELECT 1 WHERE NOT EXISTS (SELECT 1 FROM schema_version);", NULL, NULL, NULL);
 
+    /* id 不显式插入：进程重启后 session_create 的 next_id 会从 1 重来，
+     * 显式插 id 会与库里已有行主键冲突、整行被 sqlite 静默丢弃。
+     * 交给 rowid 自动分配（max(id)+1）才能跨重启连续。 */
     const char *sql = "INSERT INTO sessions(protocol,client_ip,target_host,target_port,method,upstream_id,upstream_name,status,error_code,error_msg,bytes_up,bytes_down,started_at,ended_at,duration_ms,nginx_forwarded) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
-    /* we insert id explicitly too; adjust: include id */
-    sql = "INSERT INTO sessions(id,protocol,client_ip,target_host,target_port,method,upstream_id,upstream_name,status,error_code,error_msg,bytes_up,bytes_down,started_at,ended_at,duration_ms,nginx_forwarded) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?);";
     if (sqlite3_prepare_v2(g_db, sql, -1, &g_stmt, NULL) != SQLITE_OK) {
         fprintf(stderr, "prepare failed: %s\n", sqlite3_errmsg(g_db));
         return -1;
@@ -155,25 +156,25 @@ void db_retention(int days) {
 static void insert_node(node_t *n) {
     if (!g_db || !g_stmt) return;
     sqlite3_reset(g_stmt);
-    sqlite3_bind_int64(g_stmt, 1, (sqlite3_int64)n->snap.id);
-    sqlite3_bind_text(g_stmt, 2, n->snap.protocol == PROTO_HTTP ? "http" : "socks5", -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(g_stmt, 3, n->snap.client_ip, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_text(g_stmt, 4, n->snap.target_host, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(g_stmt, 5, n->snap.target_port);
-    sqlite3_bind_text(g_stmt, 6, n->snap.method, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(g_stmt, 7, n->snap.upstream_id);
-    sqlite3_bind_text(g_stmt, 8, n->upstream_name, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int(g_stmt, 9, (int)n->snap.status);
-    sqlite3_bind_int(g_stmt, 10, n->snap.error_code);
-    sqlite3_bind_text(g_stmt, 11, n->snap.error_msg, -1, SQLITE_TRANSIENT);
-    sqlite3_bind_int64(g_stmt, 12, (sqlite3_int64)n->snap.bytes_up);
-    sqlite3_bind_int64(g_stmt, 13, (sqlite3_int64)n->snap.bytes_down);
-    sqlite3_bind_int64(g_stmt, 14, (sqlite3_int64)n->snap.started_at);
-    sqlite3_bind_int64(g_stmt, 15, (sqlite3_int64)n->snap.ended_at);
+    sqlite3_bind_text(g_stmt, 1, n->snap.protocol == PROTO_HTTP ? "http" : "socks5", -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(g_stmt, 2, n->snap.client_ip, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_text(g_stmt, 3, n->snap.target_host, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(g_stmt, 4, n->snap.target_port);
+    sqlite3_bind_text(g_stmt, 5, n->snap.method, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(g_stmt, 6, n->snap.upstream_id);
+    sqlite3_bind_text(g_stmt, 7, n->upstream_name, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(g_stmt, 8, (int)n->snap.status);
+    sqlite3_bind_int(g_stmt, 9, n->snap.error_code);
+    sqlite3_bind_text(g_stmt, 10, n->snap.error_msg, -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int64(g_stmt, 11, (sqlite3_int64)n->snap.bytes_up);
+    sqlite3_bind_int64(g_stmt, 12, (sqlite3_int64)n->snap.bytes_down);
+    sqlite3_bind_int64(g_stmt, 13, (sqlite3_int64)n->snap.started_at);
+    sqlite3_bind_int64(g_stmt, 14, (sqlite3_int64)n->snap.ended_at);
     long dur = (n->snap.ended_at > n->snap.started_at) ? (n->snap.ended_at - n->snap.started_at) * 1000 : 0;
-    sqlite3_bind_int64(g_stmt, 16, dur);
-    sqlite3_bind_int(g_stmt, 17, 0);
-    sqlite3_step(g_stmt);
+    sqlite3_bind_int64(g_stmt, 15, dur);
+    sqlite3_bind_int(g_stmt, 16, 0);
+    if (sqlite3_step(g_stmt) != SQLITE_DONE)
+        stats_inc_dropped_events(); /* 插入失败不再静默：计入 dropped 便于发现 */
 }
 
 static void *writer_main(void *arg) {
