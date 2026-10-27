@@ -32,6 +32,7 @@ static int read_varint(const unsigned char **pp, const unsigned char *end, uint6
 
 /* ---------- IP 表 ---------- */
 /* sqlite 落盘查询（调用方已持 g_lock）。v4: start/end 存 uint32；v6: 128 位拆四列。 */
+
 static void geo_tables_clear(void);
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 
@@ -427,8 +428,81 @@ static unsigned char *read_file(const char *path, size_t *out_len) {
 
 static int g_loaded = 0;
 
-/* DNS 缓存前向声明（定义在文件后部，free/reset 需先用） */
-static void dns_cache_clear(void);
+/* ---------- 统一 LRU（ip:/host: 前缀，最终判定 cn，替换旧 DNS 缓存） ---------- */
+#define GEO_LRU_CAP_DEFAULT 512
+#define GEO_LRU_CAP_MAX 4096
+#define GEO_LRU_KEY_MAX 280
+#define GEO_LRU_TTL 300
+typedef struct { char key[GEO_LRU_KEY_MAX]; int cn; time_t ts; } lru_ent_t;
+static lru_ent_t *g_lru = NULL;
+static int g_lru_cap = 0; /* 0=关闭，直查 sqlite */
+
+static int geo_norm_host(const char *host, char *out, size_t outsz) {
+    if (!host || !*host || !out || outsz == 0) return -1;
+    size_t L = strlen(host);
+    if (L >= outsz) return -1;
+    for (size_t i = 0; i <= L; i++) out[i] = (char)tolower((unsigned char)host[i]);
+    while (L && out[L - 1] == '.') out[--L] = '\0';
+    return L ? 0 : -1;
+}
+
+static int lru_get(const char *key, time_t now) {
+    if (!g_lru || g_lru_cap <= 0) return -2; /* -2=关闭 */
+    for (int i = 0; i < g_lru_cap; i++) {
+        if (g_lru[i].key[0] && strcmp(g_lru[i].key, key) == 0) {
+            if (now - g_lru[i].ts < GEO_LRU_TTL) {
+                g_lru[i].ts = now; /* 命中刷新 */
+                return g_lru[i].cn;
+            }
+            g_lru[i].key[0] = '\0'; /* 过期作废 */
+            return -2;
+        }
+    }
+    return -2;
+}
+
+static void lru_put(const char *key, int cn, time_t now) {
+    if (!g_lru || g_lru_cap <= 0) return;
+    int slot = 0;
+    time_t oldest = now;
+    int found_oldest = 0;
+    for (int i = 0; i < g_lru_cap; i++) {
+        if (!g_lru[i].key[0]) { slot = i; found_oldest = 1; break; }
+        if (!found_oldest || g_lru[i].ts < oldest) { oldest = g_lru[i].ts; slot = i; found_oldest = 1; }
+    }
+    snprintf(g_lru[slot].key, sizeof g_lru[slot].key, "%s", key);
+    g_lru[slot].cn = cn;
+    g_lru[slot].ts = now;
+}
+
+static void lru_clear(void) {
+    if (g_lru && g_lru_cap > 0) memset(g_lru, 0, (size_t)g_lru_cap * sizeof *g_lru);
+}
+
+int geo_set_cache_size(int n) {
+    if (n < 0) n = 0;
+    if (n > GEO_LRU_CAP_MAX) n = GEO_LRU_CAP_MAX;
+    pthread_mutex_lock(&g_lock);
+    free(g_lru); g_lru = NULL; g_lru_cap = 0;
+    if (n > 0) {
+        g_lru = calloc((size_t)n, sizeof *g_lru);
+        if (g_lru) g_lru_cap = n;
+    }
+    int cap = g_lru_cap;
+    pthread_mutex_unlock(&g_lock);
+    return cap;
+}
+
+int geo_cache_size(void) {
+    pthread_mutex_lock(&g_lock);
+    int cap = g_lru_cap;
+    pthread_mutex_unlock(&g_lock);
+    return cap;
+}
+
+/* DNS 缓存前向声明（定义在后部 LRU 节；free/reset 需先用） */
+static void lru_clear(void);
+static void dns_cache_clear(void) { lru_clear(); }
 /* 可注入 DNS 解析器（定义在后部 DNS 节；free/reset 需先用） */
 static geo_resolver_fn g_resolver;
 
@@ -531,6 +605,7 @@ int geo_load(const char *dir) {
     cx.ip4 = cx.ip6 = cx.exact = cx.suffix = NULL;
     if (sqlite3_exec(h, "COMMIT;", NULL, NULL, NULL) != SQLITE_OK) { sqlite3_exec(h, "ROLLBACK;", NULL, NULL, NULL); goto out; }
     g_loaded = 1;
+    lru_clear(); /* 全量更新后旧判定失效 */
     rc = 0;
 fin:
     if (cx.ip4) sqlite3_finalize(cx.ip4);
@@ -589,13 +664,29 @@ int geo_ip_is_cn(const char *ip) {
     unsigned char key[16];
     norm_key(raw, is6, key);
     if (is_private_ip(raw, is6)) return 1; /* 私网不依赖 dat */
+    char lkey[GEO_LRU_KEY_MAX];
+    snprintf(lkey, sizeof lkey, "ip:%s", ip);
     pthread_mutex_lock(&g_lock);
-    int hit = 0;
-    if (!g_loaded) hit = -1; /* 空库报未知，不许报非CN */
-    else if (is6) hit = sql_hit_ip6(key);
-    else { uint32_t a; memcpy(&a, raw, 4); hit = sql_hit_ip4(ntohl(a)); }
+    time_t now = time(NULL);
+    int cached = lru_get(lkey, now);
+    int loaded = g_loaded;
     pthread_mutex_unlock(&g_lock);
-    return hit < 0 ? -1 : (hit ? 1 : 0);
+    if (cached >= 0) return cached;
+    int hit = -1;
+    if (loaded) {
+        pthread_mutex_lock(&g_lock);
+        if (is6) hit = sql_hit_ip6(key);
+        else { uint32_t a; memcpy(&a, raw, 4); hit = sql_hit_ip4(ntohl(a)); }
+        pthread_mutex_unlock(&g_lock);
+    }
+    /* 空库报未知，不许报非CN */
+    if (hit >= 0) {
+        pthread_mutex_lock(&g_lock);
+        lru_put(lkey, hit, now);
+        pthread_mutex_unlock(&g_lock);
+        return hit ? 1 : 0;
+    }
+    return -1;
 }
 
 int geo_site_is_cn(const char *host) {
@@ -604,33 +695,27 @@ int geo_site_is_cn(const char *host) {
     struct in_addr a4; struct in6_addr a6;
     int is_lit = (inet_pton(AF_INET, host, &a4) == 1 || inet_pton(AF_INET6, host, &a6) == 1);
     char low[256];
-    size_t L = strlen(host);
     if (is_lit) low[0] = '\0';
-    else {
-        if (L >= sizeof low) return -1;
-        for (size_t i = 0; i <= L; i++) low[i] = (char)tolower((unsigned char)host[i]);
-        while (L && low[L - 1] == '.') low[--L] = '\0';
-        if (!L) return -1;
-    }
+    else if (geo_norm_host(host, low, sizeof low) != 0) return -1;
+    char lkey[GEO_LRU_KEY_MAX];
+    snprintf(lkey, sizeof lkey, "host:%s", is_lit ? host : low);
+    pthread_mutex_lock(&g_lock);
+    time_t now = time(NULL);
+    int cached = lru_get(lkey, now);
+    int loaded = g_loaded;
+    pthread_mutex_unlock(&g_lock);
+    if (cached >= 0) return cached;
     pthread_mutex_lock(&g_lock);
     int r;
-    if (!g_loaded) r = -1; /* 空库报未知，不许报非CN */
+    if (!loaded) r = -1; /* 空库报未知，不许报非CN */
     else if (is_lit) r = 0; /* IP 字面量无域名可查 */
-    else r = site_table_hit(low) ? 1 : 0;
+    else r = site_table_hit(low) > 0 ? 1 : 0;
+    int sr = (r == 1) ? 1 : (r == 0 ? 0 : -1);
+    if (r >= 0) lru_put(lkey, r, now);
     pthread_mutex_unlock(&g_lock);
-    return r;
+    return sr;
 }
 
-/* ---------- DNS + 缓存 ---------- */
-#define GEO_DNS_CAP 256
-typedef struct { char host[128]; char ip[64]; int cn; time_t ts; } dns_ent_t;
-static dns_ent_t g_dns[GEO_DNS_CAP];
-static int g_dns_pos = 0;
-
-static void dns_cache_clear(void) {
-    memset(g_dns, 0, sizeof g_dns);
-    g_dns_pos = 0;
-}
 
 /* 可注入的 DNS 解析器：默认 NULL=走系统 getaddrinfo；测试注入 fake */
 /* （定义已前移到文件顶部，供 geo_free/reset 使用） */
@@ -662,21 +747,18 @@ int geo_host_is_cn(const char *host) {
     struct in_addr a4; struct in6_addr a6;
     if (inet_pton(AF_INET, host, &a4) == 1 || inet_pton(AF_INET6, host, &a6) == 1)
         return geo_ip_is_cn(host);
+    char low[256];
+    if (geo_norm_host(host, low, sizeof low) != 0) return -1;
+    char key[GEO_LRU_KEY_MAX];
+    snprintf(key, sizeof key, "host:%s", low);
     pthread_mutex_lock(&g_lock);
     int loaded = g_loaded;
     geo_resolver_fn resolver = g_resolver;
+    time_t now = time(NULL);
+    int cached = lru_get(key, now);
     pthread_mutex_unlock(&g_lock);
     if (!loaded) return -1; /* 空库未知：不许发起 DNS，直接返回 */
-    time_t now = time(NULL);
-    pthread_mutex_lock(&g_lock);
-    for (int i = 0; i < GEO_DNS_CAP; i++) {
-        if (g_dns[i].host[0] && strcmp(g_dns[i].host, host) == 0 && now - g_dns[i].ts < 300) {
-            int c = g_dns[i].cn;
-            pthread_mutex_unlock(&g_lock);
-            return c;
-        }
-    }
-    pthread_mutex_unlock(&g_lock);
+    if (cached >= 0) return cached;
     char ipstr[64] = "";
     int cn = -1;
     if ((resolver ? resolver(host, ipstr, sizeof ipstr)
@@ -684,12 +766,9 @@ int geo_host_is_cn(const char *host) {
         cn = geo_ip_is_cn(ipstr);
         if (cn < 0) cn = -1;
     }
-    if (cn >= 0 && ipstr[0]) {
+    if (cn >= 0) {
         pthread_mutex_lock(&g_lock);
-        dns_ent_t *e = &g_dns[g_dns_pos++ % GEO_DNS_CAP];
-        snprintf(e->host, sizeof e->host, "%s", host);
-        snprintf(e->ip, sizeof e->ip, "%s", ipstr);
-        e->cn = cn; e->ts = now;
+        lru_put(key, cn, now);
         pthread_mutex_unlock(&g_lock);
     }
     return cn;

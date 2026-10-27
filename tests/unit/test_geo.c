@@ -100,6 +100,31 @@ static int must_not_resolve(const char *host, char *ip_out, size_t ipsz) {
     return -1;
 }
 
+/* RED(Task4): LRU 命中后不再碰 sqlite → 删库文件仍命中；host 归一化同条 */
+static void test_lru_hit_no_sqlite(void **s) {
+    (void)s;
+    write_dat("geoip.dat", kIpEntry, sizeof kIpEntry);
+    assert_int_equal(geo_load(g_dir), 0);
+    geo_set_cache_size(512);
+    assert_int_equal(geo_host_is_cn("1.2.3.9"), 1); /* 预热 LRU（IP 字面量直查+回填） */
+    char dbpath[256];
+    snprintf(dbpath, sizeof dbpath, "/tmp/ryba_geo_%d.db", (int)getpid());
+    db_stop();
+    remove(dbpath);
+    char wal[300]; snprintf(wal, sizeof wal, "%s-wal", dbpath); remove(wal);
+    char shm[300]; snprintf(shm, sizeof shm, "%s-shm", dbpath); remove(shm);
+    assert_int_equal(geo_host_is_cn("1.2.3.9"), 1); /* LRU 命中，不碰 sqlite */
+}
+
+static void test_lru_normalize_host(void **s) {
+    (void)s;
+    write_dat("geosite.dat", kSiteEntry, sizeof kSiteEntry);
+    assert_int_equal(geo_load(g_dir), 0);
+    geo_set_cache_size(512);
+    assert_int_equal(geo_site_is_cn("A.EXAMPLE.CN."), 1);
+    assert_int_equal(geo_site_is_cn("a.example.cn"), 1); /* 同一条 LRU */
+}
+
 static void test_host_no_dns_when_db_unloaded(void **s) {
     (void)s;
     /* 空库时 geo_host_is_cn 必须直接报未知，不许发起 DNS */
@@ -233,6 +258,8 @@ int main(void) {
         cmocka_unit_test(test_resolve_dir_no_home_falls_back_dot),
         cmocka_unit_test_setup_teardown(test_reload_replaces_without_dup, setup, teardown),
         cmocka_unit_test_setup_teardown(test_import_then_query_from_sqlite, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_lru_hit_no_sqlite, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_lru_normalize_host, setup, teardown),
     };
     return cmocka_run_group_tests(t, NULL, NULL);
 }
