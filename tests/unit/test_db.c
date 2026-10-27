@@ -1,7 +1,9 @@
 #include <cmocka.h>
 #include <event2/event.h>
 #include "rybaproxy/db.h"
+#include "rybaproxy/router.h"
 #include "rybaproxy/session.h"
+#include "rybaproxy/web_api.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -171,6 +173,32 @@ static void test_db_empty_daily(void **state) {
     rm_db(path);
 }
 
+static void test_db_rules_geo_roundtrip(void **state) {
+    (void)state;
+    char path[128];
+    snprintf(path, sizeof path, "/tmp/ryba_db_rules_%d.db", (int)getpid());
+    rm_db(path);
+    assert_int_equal(db_init(path), 0);
+    rule_t r; memset(&r, 0, sizeof r);
+    r.id = 7; r.priority = 100; r.enabled = 1;
+    snprintf(r.name, sizeof r.name, "cn-ip");
+    snprintf(r.geo_ip, sizeof r.geo_ip, "cn");
+    snprintf(r.geo_site, sizeof r.geo_site, "!cn");
+    r.upstream_id = 3;
+    assert_int_equal(web_rules_db_save(&r), 0);
+    router_t rt; router_init(&rt, "direct", 1);
+    assert_int_equal(web_rules_db_load_all(&rt), 0);
+    assert_int_equal(rt.count, 1);
+    assert_int_equal(rt.rules[0].id, 7);
+    assert_string_equal(rt.rules[0].geo_ip, "cn");
+    assert_string_equal(rt.rules[0].geo_site, "!cn");
+    assert_int_equal(rt.rules[0].upstream_id, 3);
+    assert_int_equal(rt.next_rule_id, 8);
+    router_free(&rt);
+    db_stop();
+    rm_db(path);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_db_roundtrip),
@@ -179,6 +207,7 @@ int main(void) {
         cmocka_unit_test(test_db_summary_top),
         cmocka_unit_test(test_db_settings),
         cmocka_unit_test(test_db_empty_daily),
+        cmocka_unit_test(test_db_rules_geo_roundtrip),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

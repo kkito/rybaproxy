@@ -66,6 +66,47 @@ char *web_envelope_paged(const char *inner_paged_json) {
     return s;
 }
 
+static void sql_escape(const char *src, char *dst, size_t dstsz) {
+    size_t k = 0;
+    for (size_t i = 0; src && src[i] && k + 2 < dstsz; i++) {
+        if (src[i] == '\'') dst[k++] = '\'';
+        dst[k++] = src[i];
+    }
+    dst[k] = '\0';
+}
+
+int web_rules_db_save(const rule_t *r) {
+    if (!r) return -1;
+    char pat[512], cidr[128], gip[32], gsite[32], nm[128];
+    sql_escape(r->domain_pattern, pat, sizeof pat);
+    sql_escape(r->ip_cidr, cidr, sizeof cidr);
+    sql_escape(r->geo_ip, gip, sizeof gip);
+    sql_escape(r->geo_site, gsite, sizeof gsite);
+    sql_escape(r->name, nm, sizeof nm);
+    const char *ps = "any";
+    if (r->protocol == PROTO_HTTP) ps = "http";
+    else if (r->protocol == PROTO_SOCKS5) ps = "socks5";
+    char sql[2048];
+    snprintf(sql, sizeof sql,
+        "INSERT INTO rules(id,name,priority,enabled,domain_pattern,geo_ip,geo_site,ip_cidr,port,protocol,upstream_id,created_at,updated_at) "
+        "VALUES(%d,'%s',%d,%d,'%s','%s','%s','%s',%d,'%s',%d,strftime('%%s','now'),strftime('%%s','now')) "
+        "ON CONFLICT(id) DO UPDATE SET name='%s',priority=%d,enabled=%d,domain_pattern='%s',geo_ip='%s',geo_site='%s',ip_cidr='%s',port=%d,protocol='%s',upstream_id=%d,updated_at=strftime('%%s','now');",
+        r->id, nm, r->priority, r->enabled, pat, gip, gsite, cidr, r->port, ps, r->upstream_id,
+        nm, r->priority, r->enabled, pat, gip, gsite, cidr, r->port, ps, r->upstream_id);
+    return db_exec_raw(sql);
+}
+
+int web_rules_db_delete(int id) {
+    char sql[128];
+    snprintf(sql, sizeof sql, "DELETE FROM rules WHERE id=%d;", id);
+    return db_exec_raw(sql);
+}
+
+int web_rules_db_load_all(router_t *r) {
+    if (!r) return -1;
+    return db_rules_load(r);
+}
+
 int web_rules_reload(router_t *r) {
     if (!r) return -1;
     for (int i = 0; i < r->count; i++)
@@ -424,6 +465,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             pthread_mutex_lock(&srv->lock);
             r.id = srv->router.next_rule_id++;
             router_add_rule(&srv->router, &r);
+            web_rules_db_save(&r);
             pthread_mutex_unlock(&srv->lock);
             char d[64]; snprintf(d, sizeof d, "{\"id\":%d}", r.id);
             send_envelope(conn, 201, web_envelope_json(d, NULL, NULL));
@@ -433,6 +475,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             int id = parse_id(uri, "/api/rules", query);
             pthread_mutex_lock(&srv->lock);
             int rc = router_remove_rule(&srv->router, id);
+            if (rc == 0) web_rules_db_delete(id);
             pthread_mutex_unlock(&srv->lock);
             if (rc != 0) send_envelope(conn, 404, web_envelope_json(NULL, "NOT_FOUND", "rule not found"));
             else send_envelope(conn, 200, web_envelope_json("{\"ok\":true}", NULL, NULL));
@@ -469,6 +512,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
                         else r->protocol = 0;
                     }
                     found = 1;
+                    web_rules_db_save(r);
                     break;
                 }
             }
@@ -577,14 +621,13 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             int gsite = geo_site_is_cn(host);
             int matched = -1, upid = -1; char upname[128] = "";
             pthread_mutex_lock(&srv->lock);
-            int rid = router_select(&srv->router, host, 80, 0, NULL);
-            for (int i = 0; i < srv->router.count; i++)
-                if (srv->router.rules[i].id == rid) { matched = rid; break; }
-            if (matched < 0 && rid >= 0) matched = rid;
-            int want_up = -1;
-            for (int i = 0; i < srv->router.count; i++)
-                if (srv->router.rules[i].id == matched) { want_up = srv->router.rules[i].upstream_id; break; }
-            if (want_up < 0 && srv->upstream_count) { want_up = srv->upstreams[0].id; }
+            matched = router_select_rule_id(&srv->router, host, 80, 0, NULL);
+            int want_up = router_select(&srv->router, host, 80, 0, NULL);
+            if (want_up < 0) { /* 默认出口：名字匹配 default_upstream，找不到用第一个 */
+                for (int i = 0; i < srv->upstream_count; i++)
+                    if (strcmp(srv->upstreams[i].name, srv->router.default_upstream) == 0) { want_up = srv->upstreams[i].id; break; }
+                if (want_up < 0 && srv->upstream_count) want_up = srv->upstreams[0].id;
+            }
             for (int i = 0; i < srv->upstream_count; i++)
                 if (srv->upstreams[i].id == want_up) { upid = want_up; snprintf(upname, sizeof upname, "%s", srv->upstreams[i].name); break; }
             pthread_mutex_unlock(&srv->lock);

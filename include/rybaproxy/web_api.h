@@ -8,6 +8,10 @@ struct mg_connection;
 /* envelope builders (malloc'd, caller frees) */
 char *web_envelope_json(const char *data_json, const char *err_code, const char *err_msg);
 char *web_envelope_paged(const char *inner_paged_json);
+/* rules DB 持久化（server 启动时加载） */
+int web_rules_db_save(const rule_t *r);
+int web_rules_db_delete(int id);
+int web_rules_db_load_all(router_t *r);
 
 /* pure logic helpers (unit-testable, no socket) */
 int web_rules_reload(router_t *r);

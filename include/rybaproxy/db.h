@@ -20,5 +20,7 @@ int db_settings_set(const char *key, const char *value);
 int db_exec_raw(const char *sql);
 /* db 文件所在目录（geo dat 落盘用）；失败返回-1 */
 int db_get_dir(char *out, size_t outsz);
+/* 加载 rules 表到内存路由（含 geo_ip/geo_site）；失败返回-1 */
+int db_rules_load(void *router);
 
 #endif

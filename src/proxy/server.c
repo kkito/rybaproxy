@@ -484,6 +484,9 @@ int server_init(server_ctx_t *ctx, const config_t *cfg) {
     ensure_direct(ctx);
 
     router_init(&ctx->router, ctx->config.default_upstream, ctx->config.fallback_to_direct);
+    /* rules 持久化：DB 有则加载（含 geo 条件），否则保持空路由 */
+    extern int web_rules_db_load_all(router_t *r);
+    web_rules_db_load_all(&ctx->router);
 
     ctx->base = event_base_new();
     if (!ctx->base) return -1;

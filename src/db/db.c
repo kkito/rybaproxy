@@ -1,4 +1,5 @@
 #include "rybaproxy/db.h"
+#include "rybaproxy/router.h"
 #include "rybaproxy/stats.h"
 #include "rybaproxy/upstream.h"
 
@@ -467,11 +468,50 @@ int db_settings_set(const char *key, const char *value) {
     return (rc == SQLITE_DONE) ? 0 : -1;
 }
 
+int db_rules_load(void *router) {
+    router_t *rt = (router_t *)router;
+    if (!rt) return -1;
+    const char *sql = "SELECT id,name,priority,enabled,domain_pattern,geo_ip,geo_site,ip_cidr,port,protocol,upstream_id FROM rules ORDER BY id;";
+    sqlite3_stmt *st = NULL;
+    if (sqlite3_prepare_v2(g_db, sql, -1, &st, NULL) != SQLITE_OK) return -1;
+    /* 逐行拼 rule_t：字段拷贝逻辑在 router.c 的导入 helper 里，避免 db.c 依赖 router 布局 */
+    char (*rows)[11][96] = NULL;
+    size_t n = 0, cap = 0;
+    int rc = 0;
+    while ((rc = sqlite3_step(st)) == SQLITE_ROW) {
+        if (n == cap) {
+            size_t ncap = cap ? cap * 2 : 16;
+            char (*nr)[11][96] = realloc(rows, ncap * sizeof *nr);
+            if (!nr) { sqlite3_finalize(st); free(rows); return -1; }
+            rows = nr; cap = ncap;
+        }
+        for (int c = 0; c < 11; c++) {
+            const unsigned char *t = sqlite3_column_text(st, c);
+            snprintf(rows[n][c], sizeof rows[n][c], "%s", t ? (const char *)t : "");
+        }
+        n++;
+    }
+    sqlite3_finalize(st);
+    if (rc != SQLITE_DONE) { free(rows); return -1; }
+    int maxid = 0;
+    for (size_t i = 0; i < n; i++) {
+        int aid = 0;
+        if (router_add_rule_persist(rt, rows[i], &aid) == 0 && aid > maxid) maxid = aid;
+    }
+    free(rows);
+    if (maxid >= rt->next_rule_id) rt->next_rule_id = maxid + 1;
+    return 0;
+}
+
+static pthread_mutex_t g_exec_lock = PTHREAD_MUTEX_INITIALIZER;
+
 int db_exec_raw(const char *sql) {
     if (!g_db || !sql) return -1;
+    pthread_mutex_lock(&g_exec_lock);
     char *err = NULL;
     int rc = sqlite3_exec(g_db, sql, NULL, NULL, &err);
     if (err) sqlite3_free(err);
+    pthread_mutex_unlock(&g_exec_lock);
     return (rc == SQLITE_OK) ? 0 : -1;
 }
 
