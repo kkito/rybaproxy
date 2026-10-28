@@ -44,33 +44,48 @@
 ## 5. 解析流程（详细）
 ```mermaid
 flowchart TD
-  A[输入: domain/IP] --> B{是否 IP 字面量?}
-  B -- 是 --> C[直接用 geo_ip_is_cn/geo_ip_is_lan 判断\n不触发 DNS]
-  B -- 否 --> D[域名归一化 小写+去尾点]
-  D --> E[分流: geosite -> class = domestic/foreign]
-  E --> F[缓存查找 dns:v1:{class}:{resolver_id}:{domain}\n命中且未过期且非负缓存?]
-  F -- 是 --> G[记录请求: from_cache=true，返回结果]
-  F -- 否 --> H[按 class 选择 resolver 列表\nforeign -> 配置的 DoH 列表（顺序）]
-  H --> I{当前 resolver 是 DoH 且需要解析其域名?\n（无 server_ips 且未解析）}
-  I -- 是 --> J[Bootstrap: 用 fallback IP 直连 DoH\n连接: IP:443，SNI/Host = doh_host\n若 dns.proxy!=none 则走 DNS 专用代理隧道\n校验证书]
-  J --> K{Bootstrap 成功拿到 IP?}
-  K -- 否 --> L{还有其他 fallback IP (8.8.8.8)?}
-  L -- 是 --> J
-  L -- 否 --> M{有 bootstrap_dns 传统 DNS 备选?（仅限 DoH 域名解析）}
-  M -- 是 --> N[用 bootstrap_dns 解析 doh_host（例外）\n再走 IP+SNI 连目标 DoH]
-  M -- 否 --> O[标记 resolver 失败，尝试下一个 resolver]
-  K -- 是 --> P[用拿到的 IP + Host/SNI 连目标 DoH\n走 DNS 专用代理（按配置）]
-  I -- 否 --> P
-  P --> Q{DoH 请求成功（POST application/dns-message）}
-  Q -- 否 --> R{还有下一个 DoH resolver?}
-  R -- 是 --> H
-  R -- 否 --> S{进入最终托底 fallback（1.1.1.1/8.8.8.8）\nIP 直连 DoH + Host/SNI，若 dns.proxy!=none 则走代理}
-  S --> T{托底成功?}
-  T -- 否 --> U[写负缓存（NXDOMAIN/ServFail 短TTL）\n记录请求日志（status=fail/nxdomain/timeout）\n返回错误]
-  T -- 是 --> V[解析答案]
-  Q -- 是 --> V
-  V --> W[按 TTL clamp(min_ttl,max_ttl=1800s)\n写入 LRU（key 含 class/resolver_id）\n负缓存隔离]
-  W --> X[记录请求日志（via_proxy、duration_ms、ip_count、from_cache=false）\n返回结果]
+  A["输入: domain/IP"] --> B{"是否 IP 字面量?"}
+  B -- "是" --> C["直接用 geo_ip_is_cn/geo_ip_is_lan 判断
+不触发 DNS"]
+  B -- "否" --> D["域名归一化 小写+去尾点"]
+  D --> E["分流: geosite -> class = domestic/foreign"]
+  E --> F["缓存查找 dns:v1:{class}:{resolver_id}:{domain}
+命中且未过期且非负缓存?"]
+  F -- "是" --> G["记录请求: from_cache=true，返回结果"]
+  F -- "否" --> H["按 class 选择 resolver 列表
+foreign -> 配置的 DoH 列表（顺序）"]
+  H --> I{"当前 resolver 是 DoH 且需要解析其域名?
+（无 server_ips 且未解析）"}
+  I -- "是" --> J["Bootstrap: 用 fallback IP 直连 DoH
+连接: IP:443，SNI/Host = doh_host
+若 dns.proxy!=none 则走 DNS 专用代理隧道
+校验证书"]
+  J --> K{"Bootstrap 成功拿到 IP?"}
+  K -- "否" --> L{"还有其他 fallback IP?"}
+  L -- "是" --> J
+  L -- "否" --> M{"有 bootstrap_dns 传统 DNS 备选?（仅限 DoH 域名解析）"}
+  M -- "是" --> N["用 bootstrap_dns 解析 doh_host（例外）
+再走 IP+SNI 连目标 DoH"]
+  M -- "否" --> O["标记 resolver 失败，尝试下一个 resolver"]
+  K -- "是" --> P["用拿到的 IP + Host/SNI 连目标 DoH
+走 DNS 专用代理（按配置）"]
+  I -- "否" --> P
+  P --> Q{"DoH 请求成功（POST application/dns-message）"}
+  Q -- "否" --> R{"还有下一个 DoH resolver?"}
+  R -- "是" --> H
+  R -- "否" --> S["进入最终托底 fallback（1.1.1.1/8.8.8.8）
+IP 直连 DoH + Host/SNI，若 dns.proxy!=none 则走代理"]
+  S --> T{"托底成功?"}
+  T -- "否" --> U["写负缓存（NXDOMAIN/ServFail 短TTL）
+记录请求日志
+返回错误"]
+  T -- "是" --> V["解析答案"]
+  Q -- "是" --> V
+  V --> W["按 TTL clamp(min_ttl,max_ttl=1800s)
+写入 LRU（key 含 class/resolver_id）
+负缓存隔离"]
+  W --> X["记录请求日志（via_proxy、duration_ms、ip_count、from_cache=false）
+返回结果"]
   O --> R
 ```
 
