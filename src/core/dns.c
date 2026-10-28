@@ -6,6 +6,7 @@
 #include <pthread.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 static pthread_mutex_t g_dns_lock = PTHREAD_MUTEX_INITIALIZER;
 static dns_resolver_fn g_resolver = NULL;
@@ -118,3 +119,20 @@ int dns_getaddrinfo(const char *host, const char *serv,
     const char *s = (serv && *serv) ? serv : "0";
     return getaddrinfo(host, s, &h, res);
 }
+
+/* 增强版本接口（案） */
+int dns_resolve(const char *domain, dns_class_t cls, dns_result_t *out) {
+    (void)domain; (void)cls; (void)out; return -1;
+}
+int dns_set_proxy(const char *spec) { (void)spec; return 0; }
+int dns_set_nameservers(const dns_ns_t *list, size_t n) { (void)list; (void)n; return 0; }
+int dns_add_nameserver(const dns_ns_t *ns) { (void)ns; return 0; }
+int dns_clear_nameservers(void) { return 0; }
+
+size_t dns_cache_count(void) { return 0; }
+int dns_cache_list(dns_cache_entry_t *out, size_t cap, size_t *n) { if (n) *n = 0; (void)out; (void)cap; return 0; }
+void dns_cache_flush(void) {}
+
+size_t dns_log_count(void) { return 0; }
+int dns_log_list(dns_req_log_t *out, size_t cap, size_t *n) { if (n) *n = 0; (void)out; (void)cap; return 0; }
+void dns_log_clear(void) {}

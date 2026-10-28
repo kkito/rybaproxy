@@ -23,6 +23,7 @@ add_ryba_test(test_strutil unit/test_strutil.c)
 add_ryba_test(test_pidfile unit/test_pidfile.c)
 add_ryba_test(test_daemon unit/test_daemon.c)
 add_ryba_test(test_startup_info unit/test_startup_info.c)
+add_ryba_test(test_dns unit/test_dns.c)
 
 add_executable(test_web_page unit/test_web_page.c)
 target_link_libraries(test_web_page PRIVATE cmocka::cmocka)
