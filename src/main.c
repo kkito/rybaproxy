@@ -18,6 +18,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef __APPLE__
+#include <execinfo.h>
+#endif
 
 static server_ctx_t *g_srv = NULL;
 
@@ -26,6 +29,31 @@ static void on_signal(int sig) {
     if (g_srv && g_srv->base) {
         event_base_loopbreak(g_srv->base);
     }
+}
+
+/* 崩溃兜底：SIGSEGV/SIGBUS/SIGABRT 默认直接被内核杀掉、日志里什么都不剩。
+ * 这里记一行 ERROR（含 backtrace）再重抛默认行为，让 .ips/coredump 照常生成。
+ * 注意：handler 里只做 async-signal-safe 操作 + LOG_ERROR（内部 fprintf+fflush）。 */
+static void on_crash(int sig) {
+    LOG_ERROR("FATAL signal %d, backtrace:", sig);
+#ifdef __APPLE__
+    void *bt[32];
+    int n = backtrace(bt, 32);
+    backtrace_symbols_fd(bt, n, STDERR_FILENO);
+#endif
+    signal(sig, SIG_DFL);
+    raise(sig);
+}
+
+static void install_crash_handler(void) {
+    struct sigaction sa;
+    memset(&sa, 0, sizeof sa);
+    sa.sa_handler = on_crash;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = SA_RESETHAND;
+    sigaction(SIGSEGV, &sa, NULL);
+    sigaction(SIGBUS, &sa, NULL);
+    sigaction(SIGABRT, &sa, NULL);
 }
 
 static void usage(FILE *out) {
@@ -192,6 +220,7 @@ static int cmd_start(const char *config_path, int detach) {
 
     signal(SIGINT, on_signal);
     signal(SIGTERM, on_signal);
+    install_crash_handler();
 
     geo_init();
     {

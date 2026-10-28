@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 /* 版本号由构建期生成的 version.h 注入（git describe / VERSION 文件） */
+#include "rybaproxy/log.h"
 #include "rybaproxy/version.h"
 
 char *web_envelope_json(const char *data_json, const char *err_code, const char *err_msg) {
@@ -313,9 +314,16 @@ static void read_body(struct mg_connection *conn, char *buf, size_t bufsz) {
     buf[got] = '\0';
 }
 
+/* 64K 响应缓冲放堆：civetweb 工作线程栈仅 ~144KB（crash 日志实测），栈上直接爆栈 */
+#define W_AUTO_FREE __attribute__((cleanup(w_auto_free)))
+static void w_auto_free(void *p) { void *q = *(void **)p; if (q) free(q); }
+
 void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char *uri, const char *method, const char *query) {
-    char body[4096];
-    char tmp[65536];
+    LOG_DEBUG("web %s %s", method, uri);
+    char *body W_AUTO_FREE = malloc(4096);
+    char *tmp W_AUTO_FREE = malloc(65536);
+    size_t tmpsz = 65536;
+    if (!body || !tmp) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
 
     if (strcmp(uri, "/healthz") == 0) {
         char d[128];
@@ -553,15 +561,17 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
     }
     if (strncmp(uri, "/api/geo", 8) == 0) {
         if (strcmp(uri, "/api/geo/status") == 0 && strcmp(method, "GET") == 0) {
-            char dir[512];
-            if (geo_active_dir(srv->config.geo_dir, dir, sizeof dir) != 0) snprintf(dir, sizeof dir, ".");
-            char p1[1024], p2[1024];
-            snprintf(p1, sizeof p1, "%s/geoip.dat", dir);
-            snprintf(p2, sizeof p2, "%s/geosite.dat", dir);
+            char *dir W_AUTO_FREE = malloc(512);
+            char *p1 W_AUTO_FREE = malloc(1024);
+            char *p2 W_AUTO_FREE = malloc(1024);
+            char *d W_AUTO_FREE = malloc(1400);
+            if (!dir || !p1 || !p2 || !d) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            if (geo_active_dir(srv->config.geo_dir, dir, 512) != 0) snprintf(dir, 512, ".");
+            snprintf(p1, 1024, "%s/geoip.dat", dir);
+            snprintf(p2, 1024, "%s/geosite.dat", dir);
             struct stat st1, st2;
             int e1 = stat(p1, &st1), e2 = stat(p2, &st2);
-            char d[1400];
-            snprintf(d, sizeof d,
+            snprintf(d, 1400,
                 "{\"geoip\":{\"exists\":%s,\"size\":%lld,\"mtime\":%lld,\"cn_count\":%zu,\"url\":\"%s\"},"
                 "\"geosite\":{\"exists\":%s,\"size\":%lld,\"mtime\":%lld,\"cn_count\":%zu,\"url\":\"%s\"},"
                 "\"dir\":\"%s\",\"proxy\":\"%s\"}",
@@ -574,12 +584,15 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             return;
         }
         if (strcmp(uri, "/api/geo/download") == 0 && strcmp(method, "POST") == 0) {
-            char dir[512];
-            if (geo_active_dir(srv->config.geo_dir, dir, sizeof dir) != 0) snprintf(dir, sizeof dir, ".");
-            char err[512];
-            if (geo_download(dir, err, sizeof err) != 0) {
-                char m[640];
-                snprintf(m, sizeof m, "download failed: %s", err);
+            char *dir W_AUTO_FREE = malloc(512);
+            if (!dir) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            if (geo_active_dir(srv->config.geo_dir, dir, 512) != 0) snprintf(dir, 512, ".");
+            char *err W_AUTO_FREE = malloc(512);
+            if (!err) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            if (geo_download(dir, err, 512) != 0) {
+                char *m W_AUTO_FREE = malloc(640);
+                if (!m) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+                snprintf(m, 640, "download failed: %s", err);
                 send_envelope(conn, 502, web_envelope_json(NULL, "DOWNLOAD_FAILED", m));
                 return;
             }
@@ -587,15 +600,20 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             return;
         }
         if (strcmp(uri, "/api/geo/check") == 0 && strcmp(method, "GET") == 0) {
-            char host[256];
-            qstr(query, "host", host, sizeof host);
+            char *host W_AUTO_FREE = malloc(256);
+            if (!host) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            qstr(query, "host", host, 256);
             if (!host[0]) { send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "host required")); return; }
-            char iplist[512] = "";
+            char *iplist W_AUTO_FREE = malloc(512);
+            if (!iplist) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            iplist[0] = '\0';
             struct in_addr a4; struct in6_addr a6;
-            char first_ip[64] = "";
+            char *first_ip W_AUTO_FREE = malloc(64);
+            if (!first_ip) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            first_ip[0] = '\0';
             if (inet_pton(AF_INET, host, &a4) == 1 || inet_pton(AF_INET6, host, &a6) == 1) {
-                snprintf(iplist, sizeof iplist, "[\"%s\"]", host);
-                snprintf(first_ip, sizeof first_ip, "%s", host);
+                snprintf(iplist, 512, "[\"%s\"]", host);
+                snprintf(first_ip, 64, "%s", host);
             } else {
                 struct addrinfo hints, *res = NULL;
                 memset(&hints, 0, sizeof hints);
@@ -608,18 +626,21 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
                         else if (ai->ai_family == AF_INET6) ap = &((struct sockaddr_in6 *)ai->ai_addr)->sin6_addr;
                         else continue;
                         if (!inet_ntop(ai->ai_family, ap, tmp, sizeof tmp)) continue;
-                        if (!first_ip[0]) snprintf(first_ip, sizeof first_ip, "%s", tmp);
-                        off += (size_t)snprintf(iplist + off, sizeof iplist - off, "%s\"%s\"", off ? "," : "[", tmp);
+                        if (!first_ip[0]) snprintf(first_ip, 64, "%s", tmp);
+                        off += (size_t)snprintf(iplist + off, 512 - off, "%s\"%s\"", off ? "," : "[", tmp);
                         n++;
                     }
                     freeaddrinfo(res);
-                    if (off) snprintf(iplist + off, sizeof iplist - off, "]");
-                    else snprintf(iplist, sizeof iplist, "[]");
-                } else snprintf(iplist, sizeof iplist, "[]");
+                    if (off) snprintf(iplist + off, 512 - off, "]");
+                    else snprintf(iplist, 512, "[]");
+                } else snprintf(iplist, 512, "[]");
             }
             int gip = first_ip[0] ? geo_ip_is_cn(first_ip) : -1;
             int gsite = geo_site_is_cn(host);
-            int matched = -1, upid = -1; char upname[128] = "";
+            int matched = -1, upid = -1;
+            char *upname W_AUTO_FREE = malloc(128);
+            if (!upname) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            upname[0] = '\0';
             pthread_mutex_lock(&srv->lock);
             matched = router_select_rule_id(&srv->router, host, 80, 0, NULL);
             int want_up = router_select(&srv->router, host, 80, 0, NULL);
@@ -629,17 +650,18 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
                 if (want_up < 0 && srv->upstream_count) want_up = srv->upstreams[0].id;
             }
             for (int i = 0; i < srv->upstream_count; i++)
-                if (srv->upstreams[i].id == want_up) { upid = want_up; snprintf(upname, sizeof upname, "%s", srv->upstreams[i].name); break; }
+                if (srv->upstreams[i].id == want_up) { upid = want_up; snprintf(upname, 128, "%s", srv->upstreams[i].name); break; }
             pthread_mutex_unlock(&srv->lock);
-            char d[2048];
-            snprintf(d, sizeof d,
+            char *gd W_AUTO_FREE = malloc(2048);
+            if (!gd) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            snprintf(gd, 2048,
                 "{\"host\":\"%s\",\"ips\":%s,\"geoip_cn\":%s,\"geosite_cn\":%s,\"db_loaded\":%s,\"matched_rule\":%d,\"upstream\":{\"id\":%d,\"name\":\"%s\"}}",
                 host, iplist,
                 gip < 0 ? "null" : (gip == 1 ? "true" : "false"),
                 gsite < 0 ? "null" : (gsite == 1 ? "true" : "false"),
                 geo_db_loaded() ? "true" : "false",
                 matched, upid, upname);
-            send_envelope(conn, 200, web_envelope_json(d, NULL, NULL));
+            send_envelope(conn, 200, web_envelope_json(gd, NULL, NULL));
             return;
         }
         send_envelope(conn, 404, web_envelope_json(NULL, "NOT_FOUND", "unknown geo endpoint"));
@@ -648,22 +670,25 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
     if (strncmp(uri, "/api/sessions", 13) == 0) {
         if (strcmp(method, "GET") == 0 && strncmp(uri, "/api/sessions/", 14) == 0) {
             long long id = atoll(uri + 14);
-            char one[2048];
-            int rc = db_get_session_by_id(id, one, sizeof one);
+            char *one W_AUTO_FREE = malloc(2048);
+            if (!one) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            int rc = db_get_session_by_id(id, one, 2048);
             if (rc != 0) { send_envelope(conn, 404, web_envelope_json(NULL, "NOT_FOUND", "session not found")); return; }
             send_envelope(conn, 200, web_envelope_json(one, NULL, NULL));
             return;
         }
-        char client[140], target[520];
-        qstr(query, "client", client, sizeof client);
-        qstr(query, "target", target, sizeof target);
+        char *client W_AUTO_FREE = malloc(140);
+        char *target W_AUTO_FREE = malloc(520);
+        if (!client || !target) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+        qstr(query, "client", client, 140);
+        qstr(query, "target", target, 520);
         long long up = qnum(query, "upstream");
         int has_up = (strstr(query ? query : "", "upstream=") != NULL);
         int limit = (int)qnum(query, "limit"); if (limit <= 0) limit = 100;
         int offset = (int)qnum(query, "offset");
         if (up < 0) has_up = 0;
         if (db_query_sessions(client[0] ? client : NULL, target[0] ? target : NULL,
-                has_up ? (int)up : -1, limit, offset, tmp, sizeof tmp, NULL) != 0) {
+                has_up ? (int)up : -1, limit, offset, tmp, tmpsz, NULL) != 0) {
             send_envelope(conn, 500, web_envelope_json(NULL, "DB_ERROR", "query failed"));
             return;
         }
@@ -673,7 +698,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
     if (strncmp(uri, "/api/stats", 10) == 0) {
         if (strcmp(uri, "/api/stats/summary") == 0) {
             long long from = qnum(query, "from"), to = qnum(query, "to");
-            if (db_stats_summary(from, to, tmp, sizeof tmp) != 0) {
+            if (db_stats_summary(from, to, tmp, tmpsz) != 0) {
                 send_envelope(conn, 500, web_envelope_json(NULL, "DB_ERROR", "query failed"));
                 return;
             }
@@ -682,7 +707,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
         }
         if (strcmp(uri, "/api/stats/daily") == 0) {
             int days = (int)qnum(query, "days"); if (days <= 0) days = 30;
-            if (db_stats_daily(days, tmp, sizeof tmp) != 0) {
+            if (db_stats_daily(days, tmp, tmpsz) != 0) {
                 send_envelope(conn, 500, web_envelope_json(NULL, "DB_ERROR", "query failed"));
                 return;
             }
@@ -690,11 +715,13 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             return;
         }
         if (strcmp(uri, "/api/stats/top") == 0) {
-            char by[16]; qstr(query, "by", by, sizeof by);
-            if (!by[0]) snprintf(by, sizeof by, "target");
+            char *by W_AUTO_FREE = malloc(16);
+            if (!by) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+            qstr(query, "by", by, 16);
+            if (!by[0]) snprintf(by, 16, "target");
             int limit = (int)qnum(query, "limit"); if (limit <= 0) limit = 20;
             long long from = qnum(query, "from"), to = qnum(query, "to");
-            int rc = db_stats_top(by, limit, from, to, tmp, sizeof tmp);
+            int rc = db_stats_top(by, limit, from, to, tmp, tmpsz);
             if (rc == -2) { send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "by must be target|client")); return; }
             if (rc != 0) { send_envelope(conn, 500, web_envelope_json(NULL, "DB_ERROR", "query failed")); return; }
             send_envelope(conn, 200, web_envelope_json(tmp, NULL, NULL));
@@ -718,7 +745,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             send_envelope(conn, 200, web_envelope_json("{\"ok\":true}", NULL, NULL));
             return;
         }
-        if (db_settings_get(tmp, sizeof tmp) != 0) {
+        if (db_settings_get(tmp, tmpsz) != 0) {
             send_envelope(conn, 500, web_envelope_json(NULL, "DB_ERROR", "query failed"));
             return;
         }
@@ -736,7 +763,9 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             return;
         }
         if (strcmp(uri, "/api/dns/nameservers") == 0 && strcmp(method, "GET") == 0) {
-            dns_ns_t ns[16]; int n = 0;
+            dns_ns_t *ns W_AUTO_FREE = malloc(sizeof(dns_ns_t) * 16);
+            int n = 0;
+            if (!ns) { send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
             dns_get_nameservers(ns, 16, &n);
             char *arr = malloc(4096);
             if (!arr) { send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
@@ -755,7 +784,6 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             char *env = web_envelope_json(d, NULL, NULL);
             free(d);
             send_envelope(conn, 200, env);
-            free(env);
             return;
         }
         if (strcmp(uri, "/api/dns/nameservers") == 0 && strcmp(method, "POST") == 0) {
@@ -767,7 +795,9 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             return;
         }
         if (strcmp(uri, "/api/dns/cache") == 0 && strcmp(method, "GET") == 0) {
-            dns_cache_entry_t ent[256]; size_t n = 0;
+            dns_cache_entry_t *ent W_AUTO_FREE = malloc(sizeof(dns_cache_entry_t) * 256);
+            size_t n = 0;
+            if (!ent) { send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
             dns_cache_list(ent, 256, &n);
             char *arr = malloc(8192);
             if (!arr) { send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
@@ -795,7 +825,6 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             char *env = web_envelope_json(d, NULL, NULL);
             free(d);
             send_envelope(conn, 200, env);
-            free(env);
             return;
         }
         if (strcmp(uri, "/api/dns/cache/flush") == 0 && strcmp(method, "POST") == 0) {
@@ -804,8 +833,10 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             return;
         }
         if (strcmp(uri, "/api/dns/logs") == 0 && strcmp(method, "GET") == 0) {
-            dns_req_log_t log[256]; size_t n = 0;
-            dns_log_list(log, 256, &n);
+            dns_req_log_t *dlog W_AUTO_FREE = malloc(sizeof(dns_req_log_t) * 256);
+            size_t n = 0;
+            if (!dlog) { send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
+            dns_log_list(dlog, 256, &n);
             char *arr = malloc(8192);
             if (!arr) { send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
             size_t off = 0;
@@ -814,15 +845,15 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
                 off += snprintf(arr + off, 8192 - off,
                     "%s{\"ts\":%ld,\"domain\":\"%s\",\"class\":%d,\"resolver_id\":\"%s\",\"via_proxy\":%s,\"duration_ms\":%ld,\"status\":\"%s\",\"ip_count\":%d,\"from_cache\":%s}",
                     i ? "," : "",
-                    (long)log[i].ts,
-                    log[i].domain,
-                    (int)log[i].class,
-                    log[i].resolver_id,
-                    log[i].via_proxy ? "true" : "false",
-                    log[i].duration_ms,
-                    log[i].status,
-                    log[i].ip_count,
-                    log[i].from_cache ? "true" : "false");
+                    (long)dlog[i].ts,
+                    dlog[i].domain,
+                    (int)dlog[i].class,
+                    dlog[i].resolver_id,
+                    dlog[i].via_proxy ? "true" : "false",
+                    dlog[i].duration_ms,
+                    dlog[i].status,
+                    dlog[i].ip_count,
+                    dlog[i].from_cache ? "true" : "false");
             }
             off += snprintf(arr + off, 8192 - off, "]");
             char *d = malloc(off + 32);
@@ -832,7 +863,6 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             char *env = web_envelope_json(d, NULL, NULL);
             free(d);
             send_envelope(conn, 200, env);
-            free(env);
             return;
         }
         if (strcmp(uri, "/api/dns/logs/clear") == 0 && strcmp(method, "POST") == 0) {
@@ -845,9 +875,11 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
     }
 
     if (strncmp(uri, "/api/logs", 9) == 0) {
-        char level[16]; qstr(query, "level", level, sizeof level);
+        char *level W_AUTO_FREE = malloc(16);
+        if (!level) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
+        qstr(query, "level", level, 16);
         int limit = (int)qnum(query, "limit"); if (limit <= 0) limit = 100;
-        if (web_log_query(level[0] ? level : NULL, limit, tmp, sizeof tmp) != 0) {
+        if (web_log_query(level[0] ? level : NULL, limit, tmp, tmpsz) != 0) {
             send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "log query failed"));
             return;
         }

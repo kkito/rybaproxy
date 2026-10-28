@@ -18,6 +18,40 @@ option(RYBA_ENABLE_COVERAGE "Enable code coverage (gcov)" OFF)
 
 option(RYBA_BUILD_TESTS "Build tests" ON)
 option(RYBA_USE_VCPKG "Use vcpkg toolchain" ON)
+option(RYBA_BUILD_WEB "Regenerate web UI (esbuild + gen_web_page) during build" ON)
+find_program(RYBA_NODE_EXECUTABLE node)
+# Web page source of truth: web/src/*.ts + web/index.html + web/style.css
+# → scripts/build_web.cjs (esbuild, global) → web/dist/ryba-web.js
+# → scripts/gen_web_page.js → src/web/web_page_gen.h (WEB_PAGE_HTML_GEN)
+# global esbuild needs NODE_PATH to resolve (no local node_modules)
+if(NOT RYBA_GLOBAL_NODE_PATH AND RYBA_NODE_EXECUTABLE)
+    find_program(RYBA_NPM_EXECUTABLE npm)
+    if(RYBA_NPM_EXECUTABLE)
+        execute_process(COMMAND "${RYBA_NPM_EXECUTABLE}" root -g
+            OUTPUT_VARIABLE RYBA_GLOBAL_NODE_PATH OUTPUT_STRIP_TRAILING_WHITESPACE ERROR_QUIET)
+    endif()
+endif()
+if(RYBA_BUILD_WEB)
+    if(RYBA_NODE_EXECUTABLE)
+        file(GLOB RYBA_WEB_SRCS CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/web/src/*.ts")
+        add_custom_command(
+            OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/ryba_web_page.stamp"
+            COMMAND ${CMAKE_COMMAND} -E env "NODE_PATH=${RYBA_GLOBAL_NODE_PATH}" "${RYBA_NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_web.cjs"
+            COMMAND "${RYBA_NODE_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen_web_page.js"
+            COMMAND "${CMAKE_COMMAND}" -E touch "${CMAKE_CURRENT_BINARY_DIR}/ryba_web_page.stamp"
+            DEPENDS ${RYBA_WEB_SRCS}
+                    "${CMAKE_CURRENT_SOURCE_DIR}/web/index.html"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/web/style.css"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/build_web.cjs"
+                    "${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen_web_page.js"
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+            COMMENT "Building web UI (esbuild + gen_web_page)"
+            VERBATIM)
+        add_custom_target(ryba_web_page DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/ryba_web_page.stamp")
+    else()
+        message(WARNING "node not found: web_page_gen.h will not be regenerated, using checked-in copy")
+    endif()
+endif()
 
 # Global sanitizers/coverage
 if(RYBA_ENABLE_ASAN)
@@ -94,6 +128,27 @@ foreach(f ${RYBA_SRCS})
 endforeach()
 
 add_library(rybaproxy_core STATIC ${RYBA_SRCS})
+if(TARGET ryba_web_page)
+    add_dependencies(rybaproxy_core ryba_web_page)
+endif()
+
+# ---- Frontend tests (vitest + tsc, global toolchain, no local node_modules) ----
+if(RYBA_BUILD_TESTS AND RYBA_NODE_EXECUTABLE)
+    find_program(RYBA_VITEST_EXECUTABLE vitest)
+    if(RYBA_VITEST_EXECUTABLE AND RYBA_GLOBAL_NODE_PATH)
+        # NODE_PATH lets vitest resolve global happy-dom without local install
+        add_test(NAME web_vitest
+            COMMAND ${CMAKE_COMMAND} -E env "NODE_PATH=${RYBA_GLOBAL_NODE_PATH}"
+                "${RYBA_VITEST_EXECUTABLE}" run
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/web")
+    endif()
+    find_program(RYBA_TSC_EXECUTABLE tsc)
+    if(RYBA_TSC_EXECUTABLE)
+        add_test(NAME web_tsc
+            COMMAND "${RYBA_TSC_EXECUTABLE}" --noEmit -p tsconfig.json
+            WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/web")
+    endif()
+endif()
 target_include_directories(rybaproxy_core PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${CMAKE_CURRENT_BINARY_DIR}/generated

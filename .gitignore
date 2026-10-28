@@ -4,3 +4,5 @@ vcpkg_installed/
 stats.db
 build*
 stats.db*
+web/node_modules/
+web/dist/
