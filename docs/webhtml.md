@@ -6,7 +6,7 @@
   ```
   - `vitest`：单元测试 runner（`NODE_PATH=$(npm root -g) vitest run`）
   - `happy-dom`：vitest 的 DOM 环境（`vitest.config.mjs` 里 `environment: 'happy-dom'`，跑 WebComponent 测试用）
-  - `esbuild`：TS 打包（`scripts/build_web.cjs` 把 `web/src/main.ts` 打成 `web/dist/ryba-web.js`，IIFE 全局 `RybaWeb`）
+  - `esbuild`：TS 打包（`scripts/build_web.cjs` 把 `web/src/app.ts` 打成 `build/web-dist/ryba-web.js`，IIFE 全局 `RybaWeb`），再由 `scripts/gen_web_page.js` 拼成 `build/generated/web_page_gen.h` 内嵌进二进制
   - `typescript`：类型检查（`tsc --noEmit -p web/tsconfig.json`，可选，不参与打包）
   当前验证版本：`vitest@5.0.5 / happy-dom@21.0.4 / esbuild@0.28.2 / typescript@7.0.2`
 - 页面通过webcomponent 实现

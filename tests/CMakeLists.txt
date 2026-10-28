@@ -27,5 +27,7 @@ add_ryba_test(test_dns unit/test_dns.c)
 
 add_executable(test_web_page unit/test_web_page.c)
 target_link_libraries(test_web_page PRIVATE cmocka::cmocka)
-target_include_directories(test_web_page PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_SOURCE_DIR}/src/web)
+# web_page_gen.h 是 build/generated/ 下的构建产物，测的永远是本次刚生成的页面
+target_include_directories(test_web_page PRIVATE ${CMAKE_SOURCE_DIR}/include ${CMAKE_CURRENT_BINARY_DIR}/../generated)
+add_dependencies(test_web_page ryba_web_page)
 add_test(NAME test_web_page COMMAND test_web_page)
