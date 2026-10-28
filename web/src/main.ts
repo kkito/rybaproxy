@@ -6,3 +6,4 @@ export { RybaStat } from './ryba-stat.js';
 export { RybaModal } from './ryba-modal.js';
 export { api, unwrapPage, type ApiEnvelope, type Page } from './api.js';
 export { esc, fmtBytes, sparkline, cnText, upName, geoLabel } from './format.js';
+export { dnsStatusHtml, nsTableHtml, cacheTableHtml, logsTableHtml } from './pages/dns.js';

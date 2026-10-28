@@ -66,6 +66,22 @@ static void test_page_geo_hooks_tail(void **state) {
     assert_true(strstr(WEB_PAGE_HTML_GEN, "db_loaded") != NULL);
 }
 
+static void test_page_dns_hooks(void **state) {
+    (void)state;
+    /* DNS 卡片：状态/代理设置/nameserver/缓存/日志 + 后端接口调用 */
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "dnsStatus") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "dnsNsTable") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "dnsCacheTable") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "dnsLogsTable") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "/api/dns/status") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "/api/dns/nameservers") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "/api/dns/cache") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "/api/dns/logs") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "/api/dns/cache/flush") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "/api/dns/logs/clear") != NULL);
+    assert_true(strstr(WEB_PAGE_HTML_GEN, "/api/dns/proxy") != NULL);
+}
+
 static void test_page_geo_js_no_raw_newline_in_string(void **state) {
     (void)state;
     /* 生成页由 esbuild 打包，转义由工具链保证；这里只锁行为钩子存在 */
@@ -90,6 +106,7 @@ int main(void) {
         cmocka_unit_test(test_page_geo_hooks_tail),
         cmocka_unit_test(test_page_geo_js_no_raw_newline_in_string),
         cmocka_unit_test(test_page_geo_status_updated_on_success),
+        cmocka_unit_test(test_page_dns_hooks),
         cmocka_unit_test(test_page_layout_stack),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);

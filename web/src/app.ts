@@ -1,6 +1,8 @@
 // @ts-nocheck
 import { api, unwrapPage, type Page } from './api.js';
 import { esc, fmtBytes, sparkline, cnText, upName, geoLabel } from './format.js';
+import { dnsStatusHtml, nsTableHtml, cacheTableHtml, logsTableHtml,
+  type DnsStatus, type DnsNs, type DnsCacheEntry, type DnsLogEntry } from './pages/dns.js';
 import './ryba-card.js';
 import './ryba-stat.js';
 import './ryba-modal.js';
@@ -14,12 +16,33 @@ interface DayStat { day: string; bytes_up: number; bytes_down: number; sessions:
 interface Metrics { total_sessions?: number; errors?: number; dropped?: number }
 interface Session { protocol: string; client_ip: string; target_host: string; target_port: number; status: number | string; bytes_up: number; bytes_down: number }
 
+let dnsStatus: DnsStatus | null = null, dnsNs: DnsNs[] = [];
+
+async function reloadDns(){
+  try {
+    const [st, ns, ca, lg] = await Promise.all([
+      api<DnsStatus>('/api/dns/status'), api<{ nameservers: DnsNs[] }>('/api/dns/nameservers'),
+      api<{ cache: DnsCacheEntry[] }>('/api/dns/cache'), api<{ logs: DnsLogEntry[] }>('/api/dns/logs'),
+    ]);
+    dnsStatus = st.data || null; dnsNs = (ns.data && ns.data.nameservers) || [];
+    const stEl = document.getElementById('dnsStatus');
+    if (stEl && dnsStatus) stEl.innerHTML = dnsStatusHtml(dnsStatus);
+    const nsTb = document.querySelector('#dnsNsTable tbody');
+    if (nsTb) nsTb.innerHTML = nsTableHtml(dnsNs);
+    const caTb = document.querySelector('#dnsCacheTable tbody');
+    if (caTb) caTb.innerHTML = cacheTableHtml((ca.data && ca.data.cache) || []);
+    const lgTb = document.querySelector('#dnsLogsTable tbody');
+    if (lgTb) lgTb.innerHTML = logsTableHtml((lg.data && lg.data.logs) || []);
+  } catch(e){ /* keep old dns panel on failure */ }
+}
+
 let upstreams: Upstream[] = [], rules: Rule[] = [], daily: DayStat[] = [];
 let sessPage: Page<Session> = { rows: [], total: 0, limit: 20, offset: 0 };
 let sessFilter = { client: '', target: '' };
 
 async function loadAll(){
   try { await reloadGeoStatus(); } catch(e){}
+  try { await reloadDns(); } catch(e){}
   const [mu, mr, ms, mm, md] = await Promise.all([
     api<Upstream[]>('/api/upstreams'), api<Rule[]>('/api/rules'),
     api<Session[]>(`/api/sessions?limit=20&offset=0`),
@@ -296,5 +319,19 @@ function bindFilter(id, key){
   });
 }
 bindFilter('fltClient','client'); bindFilter('fltTarget','target');
+document.getElementById('dnsReload')?.addEventListener('click', () => reloadDns());
+document.getElementById('dnsCacheFlush')?.addEventListener('click', async () => {
+  try { await api('/api/dns/cache/flush', { method: 'POST' }); toast('DNS 缓存已清空'); await reloadDns(); }
+  catch(err){ toast('清空失败：' + (err as Error).message); }
+});
+document.getElementById('dnsLogsClear')?.addEventListener('click', async () => {
+  try { await api('/api/dns/logs/clear', { method: 'POST' }); toast('DNS 日志已清空'); await reloadDns(); }
+  catch(err){ toast('清空失败：' + (err as Error).message); }
+});
+document.getElementById('dnsProxySave')?.addEventListener('click', async () => {
+  const v = (document.getElementById('dnsProxy') as HTMLInputElement)?.value.trim() || 'none';
+  try { await api('/api/dns/proxy', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ proxy: v }) }); toast('DNS 代理已更新'); await reloadDns(); }
+  catch(err){ toast('保存失败：' + (err as Error).message); }
+});
 loadAll().catch(e => toast('加载失败：' + e.message));
 setInterval(refreshLive, 5000);

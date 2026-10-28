@@ -76,6 +76,41 @@
     <ryba-card>
       <div class="card-head">
         <div>
+          <div class="card-eyebrow">DNS</div>
+          <div class="card-title">解析设置</div>
+        </div>
+        <button class="btn ghost sm" id="dnsReload">刷新</button>
+      </div>
+      <div id="dnsStatus" style="font-size:.82rem;margin-bottom:12px;">DNS 状态加载中…</div>
+      <div class="form-row" style="margin-bottom:12px;">
+        <input id="dnsProxy" placeholder="代理，如 none 或 upstream:1" style="padding:7px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;flex:1 1 200px;">
+        <button class="btn sm" id="dnsProxySave">保存代理</button>
+      </div>
+      <table class="table" id="dnsNsTable">
+        <thead><tr><th>类型</th><th>URL</th><th>Host</th><th>代理</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="card-head" style="margin-top:16px;">
+        <div><div class="card-eyebrow">DNS</div><div class="card-title" style="font-size:1rem;">缓存</div></div>
+        <button class="btn ghost sm" id="dnsCacheFlush">清空缓存</button>
+      </div>
+      <table class="table" id="dnsCacheTable">
+        <thead><tr><th>域名</th><th>类型</th><th>IP</th><th>剩余TTL</th><th>命中</th><th>解析器</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="card-head" style="margin-top:16px;">
+        <div><div class="card-eyebrow">DNS</div><div class="card-title" style="font-size:1rem;">请求日志</div></div>
+        <button class="btn ghost sm" id="dnsLogsClear">清空日志</button>
+      </div>
+      <table class="table" id="dnsLogsTable">
+        <thead><tr><th>域名</th><th>类型</th><th>状态</th><th>耗时</th><th>IP数</th><th>来源</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </ryba-card>
+
+    <ryba-card>
+      <div class="card-head">
+        <div>
           <div class="card-eyebrow">路由</div>
           <div class="card-title">规则列表</div>
         </div>
