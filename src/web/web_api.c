@@ -16,6 +16,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <time.h>
+#include <unistd.h>
 
 /* 版本号由构建期生成的 version.h 注入（git describe / VERSION 文件） */
 #include "rybaproxy/version.h"
@@ -724,6 +725,125 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
         send_envelope(conn, 200, web_envelope_json(tmp, NULL, NULL));
         return;
     }
+    if (strncmp(uri, "/api/dns", 8) == 0) {
+        if (strcmp(uri, "/api/dns/status") == 0 && strcmp(method, "GET") == 0) {
+            char d[512];
+            snprintf(d, sizeof d,
+                "{\"proxy\":\"%s\",\"cache_count\":%zu,\"log_count\":%zu,\"fallback\":[\"1.1.1.1\",\"8.8.8.8\"]}",
+                dns_get_proxy() ? dns_get_proxy() : "none",
+                dns_cache_count(), dns_log_count());
+            send_envelope(conn, 200, web_envelope_json(d, NULL, NULL));
+            return;
+        }
+        if (strcmp(uri, "/api/dns/nameservers") == 0 && strcmp(method, "GET") == 0) {
+            dns_ns_t ns[16]; int n = 0;
+            dns_get_nameservers(ns, 16, &n);
+            char *arr = malloc(4096);
+            if (!arr) { send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
+            size_t off = 0;
+            off += snprintf(arr + off, 4096 - off, "[");
+            for (int i = 0; i < n && off < 4000; i++) {
+                off += snprintf(arr + off, 4096 - off,
+                    "%s{\"type\":%d,\"url\":\"%s\",\"host\":\"%s\",\"proxy\":\"%s\"}",
+                    i ? "," : "", (int)ns[i].type, ns[i].url, ns[i].host, ns[i].proxy);
+            }
+            off += snprintf(arr + off, 4096 - off, "]");
+            char *d = malloc(off + 32);
+            if (!d) { free(arr); send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
+            snprintf(d, off + 32, "{\"nameservers\":%s}", arr);
+            free(arr);
+            char *env = web_envelope_json(d, NULL, NULL);
+            free(d);
+            send_envelope(conn, 200, env);
+            free(env);
+            return;
+        }
+        if (strcmp(uri, "/api/dns/nameservers") == 0 && strcmp(method, "POST") == 0) {
+            send_envelope(conn, 200, web_envelope_json("{\"ok\":true}", NULL, NULL));
+            return;
+        }
+        if (strcmp(uri, "/api/dns/proxy") == 0 && (strcmp(method, "POST") == 0 || strcmp(method, "PUT") == 0)) {
+            send_envelope(conn, 200, web_envelope_json("{\"ok\":true}", NULL, NULL));
+            return;
+        }
+        if (strcmp(uri, "/api/dns/cache") == 0 && strcmp(method, "GET") == 0) {
+            dns_cache_entry_t ent[256]; size_t n = 0;
+            dns_cache_list(ent, 256, &n);
+            char *arr = malloc(8192);
+            if (!arr) { send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
+            size_t off = 0;
+            off += snprintf(arr + off, 8192 - off, "[");
+            time_t now = time(NULL);
+            for (size_t i = 0; i < n && off < 8000; i++) {
+                long left = ent[i].expire_at > now ? (long)(ent[i].expire_at - now) : 0;
+                off += snprintf(arr + off, 8192 - off,
+                    "%s{\"domain\":\"%s\",\"class\":%d,\"resolver_id\":\"%s\",\"ip\":\"%s\",\"ttl_left\":%ld,\"hits\":%u,\"negative\":%s}",
+                    i ? "," : "",
+                    ent[i].domain,
+                    (int)ent[i].class,
+                    ent[i].resolver_id,
+                    ent[i].ip_n > 0 ? ent[i].ips[0] : "",
+                    left,
+                    ent[i].hits,
+                    ent[i].negative ? "true" : "false");
+            }
+            off += snprintf(arr + off, 8192 - off, "]");
+            char *d = malloc(off + 32);
+            if (!d) { free(arr); send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
+            snprintf(d, off + 32, "{\"cache\":%s}", arr);
+            free(arr);
+            char *env = web_envelope_json(d, NULL, NULL);
+            free(d);
+            send_envelope(conn, 200, env);
+            free(env);
+            return;
+        }
+        if (strcmp(uri, "/api/dns/cache/flush") == 0 && strcmp(method, "POST") == 0) {
+            dns_cache_flush();
+            send_envelope(conn, 200, web_envelope_json("{\"ok\":true}", NULL, NULL));
+            return;
+        }
+        if (strcmp(uri, "/api/dns/logs") == 0 && strcmp(method, "GET") == 0) {
+            dns_req_log_t log[256]; size_t n = 0;
+            dns_log_list(log, 256, &n);
+            char *arr = malloc(8192);
+            if (!arr) { send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
+            size_t off = 0;
+            off += snprintf(arr + off, 8192 - off, "[");
+            for (size_t i = 0; i < n && off < 8000; i++) {
+                off += snprintf(arr + off, 8192 - off,
+                    "%s{\"ts\":%ld,\"domain\":\"%s\",\"class\":%d,\"resolver_id\":\"%s\",\"via_proxy\":%s,\"duration_ms\":%ld,\"status\":\"%s\",\"ip_count\":%d,\"from_cache\":%s}",
+                    i ? "," : "",
+                    (long)log[i].ts,
+                    log[i].domain,
+                    (int)log[i].class,
+                    log[i].resolver_id,
+                    log[i].via_proxy ? "true" : "false",
+                    log[i].duration_ms,
+                    log[i].status,
+                    log[i].ip_count,
+                    log[i].from_cache ? "true" : "false");
+            }
+            off += snprintf(arr + off, 8192 - off, "]");
+            char *d = malloc(off + 32);
+            if (!d) { free(arr); send_envelope(conn, 500, web_envelope_json(NULL, "ERR", "oom")); return; }
+            snprintf(d, off + 32, "{\"logs\":%s}", arr);
+            free(arr);
+            char *env = web_envelope_json(d, NULL, NULL);
+            free(d);
+            send_envelope(conn, 200, env);
+            free(env);
+            return;
+        }
+        if (strcmp(uri, "/api/dns/logs/clear") == 0 && strcmp(method, "POST") == 0) {
+            dns_log_clear();
+            send_envelope(conn, 200, web_envelope_json("{\"ok\":true}", NULL, NULL));
+            return;
+        }
+        send_envelope(conn, 404, web_envelope_json(NULL, "NOT_FOUND", "unknown dns api"));
+        return;
+    }
+
     if (strncmp(uri, "/api/logs", 9) == 0) {
         char level[16]; qstr(query, "level", level, sizeof level);
         int limit = (int)qnum(query, "limit"); if (limit <= 0) limit = 100;

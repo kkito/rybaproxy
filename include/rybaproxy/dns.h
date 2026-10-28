@@ -77,9 +77,11 @@ int dns_getaddrinfo(const char *host, const char *serv,
 /* 增强版本接口（保持向后兼容） */
 int dns_resolve(const char *domain, dns_class_t cls, dns_result_t *out);
 int dns_set_proxy(const char *spec);
+const char *dns_get_proxy(void);
 int dns_set_nameservers(const dns_ns_t *list, size_t n);
 int dns_add_nameserver(const dns_ns_t *ns);
 int dns_clear_nameservers(void);
+int dns_get_nameservers(dns_ns_t *out, size_t cap, int *n);
 
 size_t dns_cache_count(void);
 int dns_cache_list(dns_cache_entry_t *out, size_t cap, size_t *n);

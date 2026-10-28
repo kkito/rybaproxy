@@ -193,6 +193,10 @@ int dns_set_proxy(const char *spec) {
     return 0;
 }
 
+const char *dns_get_proxy(void) {
+    return g_dns_proxy;
+}
+
 int dns_set_nameservers(const dns_ns_t *list, size_t n) {
     pthread_mutex_lock(&g_dns_lock);
     g_ns_n = 0;
@@ -220,6 +224,19 @@ int dns_clear_nameservers(void) {
     pthread_mutex_lock(&g_dns_lock);
     g_ns_n = 0;
     pthread_mutex_unlock(&g_dns_lock);
+    return 0;
+}
+
+int dns_get_nameservers(dns_ns_t *out, size_t cap, int *n) {
+    if (n) *n = 0;
+    if (!out || cap == 0) return 0;
+    pthread_mutex_lock(&g_dns_lock);
+    int c = 0;
+    for (int i = 0; i < g_ns_n && c < (int)cap; i++) {
+        out[c++] = g_nameservers[i];
+    }
+    pthread_mutex_unlock(&g_dns_lock);
+    if (n) *n = c;
     return 0;
 }
 
