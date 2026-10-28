@@ -1,4 +1,5 @@
 #include "rybaproxy/upstream.h"
+#include "rybaproxy/dns.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -44,7 +45,7 @@ static int tcp_connect_host(const char *host, uint16_t port, int sec) {
     hints.ai_socktype = SOCK_STREAM;
     char portstr[16];
     snprintf(portstr, sizeof portstr, "%u", port);
-    if (getaddrinfo(host, portstr, &hints, &res) != 0) return -1;
+    if (dns_getaddrinfo(host, portstr, &hints, &res) != 0 || !res) return -1;
     int fd = -1;
     for (struct addrinfo *ai = res; ai; ai = ai->ai_next) {
         fd = socket(ai->ai_family, ai->ai_socktype, ai->ai_protocol);
@@ -208,7 +209,7 @@ int upstream_test_reachable(const upstream_profile_t *up, int timeout_ms, long *
     hints.ai_socktype = SOCK_STREAM;
     char portstr[16];
     snprintf(portstr, sizeof portstr, "%u", up->port);
-    if (getaddrinfo(up->host, portstr, &hints, &res) != 0) return -1;
+    if (dns_getaddrinfo(up->host, portstr, &hints, &res) != 0 || !res) return -1;
     int sec = timeout_ms / 1000;
     int msec = timeout_ms % 1000;
     int ok = -1;

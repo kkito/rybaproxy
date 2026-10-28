@@ -1,6 +1,7 @@
 #include "rybaproxy/config.h"
 #include "rybaproxy/daemon.h"
 #include "rybaproxy/db.h"
+#include "rybaproxy/dns.h"
 #include "rybaproxy/geo.h"
 #include "rybaproxy/log.h"
 #include "rybaproxy/paths.h"
@@ -169,6 +170,8 @@ static int cmd_start(const char *config_path, int detach) {
     if (pidfile_write(cfg.pid_file, (long)getpid()) != 0)
         LOG_WARN("cannot write pidfile %s, `rybaproxy stop` will not find this instance", cfg.pid_file);
 
+    dns_init();
+    dns_set_timeout_sec(cfg.dns_timeout_sec);
     geo_set_cache_size(cfg.geo_cache_size);
     stats_init();
 

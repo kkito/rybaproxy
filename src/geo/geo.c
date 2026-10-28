@@ -1,5 +1,6 @@
 #include "rybaproxy/geo.h"
 #include "rybaproxy/db.h"
+#include "rybaproxy/dns.h"
 #include "rybaproxy/paths.h"
 
 #include <arpa/inet.h>
@@ -503,9 +504,6 @@ int geo_cache_size(void) {
 /* DNS 缓存前向声明（定义在后部 LRU 节；free/reset 需先用） */
 static void lru_clear(void);
 static void dns_cache_clear(void) { lru_clear(); }
-/* 可注入 DNS 解析器（定义在后部 DNS 节；free/reset 需先用） */
-static geo_resolver_fn g_resolver;
-static int sys_resolve(const char *host, char *ip_out, size_t ipsz);
 
 int geo_init(void) { return 0; }
 
@@ -514,8 +512,8 @@ void geo_free(void) {
     geo_tables_clear();
     dns_cache_clear();
     g_loaded = 0;
-    g_resolver = NULL;
     pthread_mutex_unlock(&g_lock);
+    dns_set_resolver(NULL);
 }
 
 static void geo_tables_clear(void) {
@@ -545,15 +543,12 @@ void geo_test_reset(void) {
     geo_tables_clear();
     dns_cache_clear();
     g_loaded = 0;
-    g_resolver = NULL;
     pthread_mutex_unlock(&g_lock);
+    dns_set_resolver(NULL);
 }
 
 void *geo_test_get_resolver(void) {
-    pthread_mutex_lock(&g_lock);
-    void *r = (void *)g_resolver;
-    pthread_mutex_unlock(&g_lock);
-    return r;
+    return dns_test_get_resolver();
 }
 size_t geo_ip_count(void) { int n = sql_count("SELECT COUNT(*) FROM geo_ip")
     + sql_count("SELECT COUNT(*) FROM geo_ip6"); return n < 0 ? 0 : (size_t)n; }
@@ -730,13 +725,11 @@ int geo_host_is_lan(const char *host) {
     pthread_mutex_lock(&g_lock);
     time_t now = time(NULL);
     int cached = lru_get(key, now);
-    geo_resolver_fn resolver = g_resolver;
     pthread_mutex_unlock(&g_lock);
     if (cached >= 0) return cached;
     char ipstr[64] = "";
     int lan = -1;
-    if ((resolver ? resolver(host, ipstr, sizeof ipstr)
-                  : sys_resolve(host, ipstr, sizeof ipstr)) == 0 && ipstr[0])
+    if (dns_resolve_first(host, "80", ipstr, sizeof ipstr) == 0 && ipstr[0])
         lan = geo_ip_is_lan(ipstr);
     if (lan >= 0) {
         pthread_mutex_lock(&g_lock);
@@ -774,29 +767,9 @@ int geo_site_is_cn(const char *host) {
 }
 
 
-/* 可注入的 DNS 解析器：默认 NULL=走系统 getaddrinfo；测试注入 fake */
-/* （定义已前移到文件顶部，供 geo_free/reset 使用） */
-
+/* 可注入的 DNS 解析器：转发到 dns 模块 */
 void geo_set_resolver(geo_resolver_fn fn) {
-    pthread_mutex_lock(&g_lock);
-    g_resolver = fn;
-    pthread_mutex_unlock(&g_lock);
-}
-
-/* 系统 DNS（唯一碰网络的地方；单测用注入绕过） */
-static int sys_resolve(const char *host, char *ip_out, size_t ipsz) {
-    struct addrinfo hints, *res = NULL;
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM;
-    int rc = -1;
-    if (getaddrinfo(host, "80", &hints, &res) == 0 && res) {
-        void *ap = NULL;
-        if (res->ai_family == AF_INET) ap = &((struct sockaddr_in *)res->ai_addr)->sin_addr;
-        else if (res->ai_family == AF_INET6) ap = &((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
-        if (ap && inet_ntop(res->ai_family, ap, ip_out, (socklen_t)ipsz)) rc = 0;
-        freeaddrinfo(res);
-    }
-    return rc;
+    dns_set_resolver(fn);
 }
 
 int geo_host_is_cn(const char *host) {
@@ -810,7 +783,6 @@ int geo_host_is_cn(const char *host) {
     snprintf(key, sizeof key, "host:%s", low);
     pthread_mutex_lock(&g_lock);
     int loaded = g_loaded;
-    geo_resolver_fn resolver = g_resolver;
     time_t now = time(NULL);
     int cached = lru_get(key, now);
     pthread_mutex_unlock(&g_lock);
@@ -818,8 +790,7 @@ int geo_host_is_cn(const char *host) {
     if (cached >= 0) return cached;
     char ipstr[64] = "";
     int cn = -1;
-    if ((resolver ? resolver(host, ipstr, sizeof ipstr)
-                  : sys_resolve(host, ipstr, sizeof ipstr)) == 0 && ipstr[0]) {
+    if (dns_resolve_first(host, "80", ipstr, sizeof ipstr) == 0 && ipstr[0]) {
         cn = geo_ip_is_cn(ipstr);
         if (cn < 0) cn = -1;
     }

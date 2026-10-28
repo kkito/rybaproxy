@@ -3,6 +3,7 @@
 #include "rybaproxy/db.h"
 #include "rybaproxy/router.h"
 #include "rybaproxy/upstream.h"
+#include "rybaproxy/dns.h"
 
 #include "rybaproxy/geo.h"
 
@@ -598,7 +599,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
                 struct addrinfo hints, *res = NULL;
                 memset(&hints, 0, sizeof hints);
                 hints.ai_family = AF_UNSPEC; hints.ai_socktype = SOCK_STREAM;
-                if (getaddrinfo(host, "80", &hints, &res) == 0 && res) {
+                if (dns_getaddrinfo(host, "80", &hints, &res) == 0 && res) {
                     char tmp[64]; size_t off = 0; int n = 0;
                     for (struct addrinfo *ai = res; ai && n < 4; ai = ai->ai_next) {
                         void *ap = NULL;
