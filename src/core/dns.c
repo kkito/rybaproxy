@@ -4,6 +4,7 @@
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -11,6 +12,24 @@
 static pthread_mutex_t g_dns_lock = PTHREAD_MUTEX_INITIALIZER;
 static dns_resolver_fn g_resolver = NULL;
 static int g_dns_timeout_sec = 5;
+
+#define DNS_CACHE_CAP 1024
+#define DNS_NEG_TTL_MIN 10
+#define DNS_NEG_TTL_MAX 60
+#define DNS_TTL_MIN 60
+#define DNS_TTL_MAX 1800
+
+typedef struct {
+    char key[320];
+    dns_cache_entry_t e;
+    int used;
+} dns_cache_ent_internal_t;
+
+static dns_cache_ent_internal_t g_cache[DNS_CACHE_CAP];
+static pthread_mutex_t g_cache_lock = PTHREAD_MUTEX_INITIALIZER;
+static char g_dns_proxy[64] = "none";
+static dns_ns_t g_nameservers[16];
+static int g_ns_n = 0;
 
 void dns_init(void) {}
 
@@ -121,17 +140,119 @@ int dns_getaddrinfo(const char *host, const char *serv,
 }
 
 /* 增强版本接口（案） */
-int dns_resolve(const char *domain, dns_class_t cls, dns_result_t *out) {
-    (void)domain; (void)cls; (void)out; return -1;
+static int dns_clamp_ttl(int ttl, int is_neg) {
+    if (is_neg) {
+        if (ttl < DNS_NEG_TTL_MIN) ttl = DNS_NEG_TTL_MIN;
+        if (ttl > DNS_NEG_TTL_MAX) ttl = DNS_NEG_TTL_MAX;
+        return ttl;
+    }
+    if (ttl < DNS_TTL_MIN) ttl = DNS_TTL_MIN;
+    if (ttl > DNS_TTL_MAX) ttl = DNS_TTL_MAX;
+    return ttl;
 }
-int dns_set_proxy(const char *spec) { (void)spec; return 0; }
-int dns_set_nameservers(const dns_ns_t *list, size_t n) { (void)list; (void)n; return 0; }
-int dns_add_nameserver(const dns_ns_t *ns) { (void)ns; return 0; }
-int dns_clear_nameservers(void) { return 0; }
 
-size_t dns_cache_count(void) { return 0; }
-int dns_cache_list(dns_cache_entry_t *out, size_t cap, size_t *n) { if (n) *n = 0; (void)out; (void)cap; return 0; }
-void dns_cache_flush(void) {}
+static void dns_make_pos_key(const char *domain, dns_class_t cls, char *out, size_t outsz) {
+    snprintf(out, outsz, "dns:v1:%d:%s", (int)cls, domain ? domain : "");
+}
+
+static void dns_make_neg_key(const char *domain, dns_class_t cls, const char *resolver_id, char *out, size_t outsz) {
+    snprintf(out, outsz, "dns:v1:%d:%s:%s:neg", (int)cls, domain ? domain : "", resolver_id ? resolver_id : "");
+}
+
+int dns_resolve(const char *domain, dns_class_t cls, dns_result_t *out) {
+    if (!domain || !out) return -1;
+    pthread_mutex_lock(&g_cache_lock);
+    char key[320];
+    dns_make_pos_key(domain, cls, key, sizeof key);
+    time_t now = time(NULL);
+    for (int i = 0; i < DNS_CACHE_CAP; i++) {
+        if (g_cache[i].used && strcmp(g_cache[i].key, key) == 0 && !g_cache[i].e.negative) {
+            if (g_cache[i].e.expire_at > now) {
+                out->ip_n = g_cache[i].e.ip_n;
+                for (int j = 0; j < out->ip_n && j < 4; j++) snprintf(out->ips[j], sizeof out->ips[j], "%s", g_cache[i].e.ips[j]);
+                out->ttl = g_cache[i].e.ttl_eff;
+                out->class = g_cache[i].e.class;
+                snprintf(out->resolver_id, sizeof out->resolver_id, "%s", g_cache[i].e.resolver_id);
+                out->from_cache = true;
+                g_cache[i].e.last_used = now;
+                g_cache[i].e.hits++;
+                pthread_mutex_unlock(&g_cache_lock);
+                return 0;
+            }
+        }
+    }
+    pthread_mutex_unlock(&g_cache_lock);
+    return -1;
+}
+
+int dns_set_proxy(const char *spec) {
+    pthread_mutex_lock(&g_dns_lock);
+    if (spec && *spec) snprintf(g_dns_proxy, sizeof g_dns_proxy, "%s", spec);
+    else snprintf(g_dns_proxy, sizeof g_dns_proxy, "none");
+    pthread_mutex_unlock(&g_dns_lock);
+    return 0;
+}
+
+int dns_set_nameservers(const dns_ns_t *list, size_t n) {
+    pthread_mutex_lock(&g_dns_lock);
+    g_ns_n = 0;
+    if (list && n > 0) {
+        size_t m = n > (size_t)(sizeof g_nameservers)/sizeof g_nameservers[0] ? (sizeof g_nameservers)/sizeof g_nameservers[0] : n;
+        for (size_t i = 0; i < m; i++) g_nameservers[g_ns_n++] = list[i];
+    }
+    pthread_mutex_unlock(&g_dns_lock);
+    return 0;
+}
+
+int dns_add_nameserver(const dns_ns_t *ns) {
+    if (!ns) return -1;
+    pthread_mutex_lock(&g_dns_lock);
+    if (g_ns_n < (int)(sizeof g_nameservers)/sizeof g_nameservers[0]) {
+        g_nameservers[g_ns_n++] = *ns;
+        pthread_mutex_unlock(&g_dns_lock);
+        return 0;
+    }
+    pthread_mutex_unlock(&g_dns_lock);
+    return -1;
+}
+
+int dns_clear_nameservers(void) {
+    pthread_mutex_lock(&g_dns_lock);
+    g_ns_n = 0;
+    pthread_mutex_unlock(&g_dns_lock);
+    return 0;
+}
+
+size_t dns_cache_count(void) {
+    pthread_mutex_lock(&g_cache_lock);
+    size_t c = 0;
+    time_t now = time(NULL);
+    for (int i = 0; i < DNS_CACHE_CAP; i++) if (g_cache[i].used && g_cache[i].e.expire_at > now) c++;
+    pthread_mutex_unlock(&g_cache_lock);
+    return c;
+}
+
+int dns_cache_list(dns_cache_entry_t *out, size_t cap, size_t *n) {
+    if (n) *n = 0;
+    if (!out || cap == 0) return 0;
+    pthread_mutex_lock(&g_cache_lock);
+    size_t c = 0;
+    time_t now = time(NULL);
+    for (int i = 0; i < DNS_CACHE_CAP && c < cap; i++) {
+        if (!g_cache[i].used) continue;
+        if (g_cache[i].e.expire_at <= now) continue;
+        out[c++] = g_cache[i].e;
+    }
+    pthread_mutex_unlock(&g_cache_lock);
+    if (n) *n = c;
+    return 0;
+}
+
+void dns_cache_flush(void) {
+    pthread_mutex_lock(&g_cache_lock);
+    memset(g_cache, 0, sizeof g_cache);
+    pthread_mutex_unlock(&g_cache_lock);
+}
 
 size_t dns_log_count(void) { return 0; }
 int dns_log_list(dns_req_log_t *out, size_t cap, size_t *n) { if (n) *n = 0; (void)out; (void)cap; return 0; }
