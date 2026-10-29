@@ -1,8 +1,13 @@
 // @ts-nocheck
 import { api, unwrapPage, type Page } from './api.js';
-import { esc, fmtBytes, sparkline, cnText, upName, geoLabel } from './format.js';
+import { upstreamRowHtml, upstreamOptionsHtml, type Upstream } from './upstreams.js';
+import { upstreamRowHtml, type Upstream } from './upstreams.js';
+import { ruleRowHtml, type Rule } from './rules.js';
+import { sessionRowHtml, emptyRowHtml, pagerHtml, type Session } from './sessions.js';
+import { heatLevel, heroValues, type DayStat, type Metrics } from './dashboard.js';
 import { dnsStatusHtml, nsTableHtml, cacheTableHtml, logsTableHtml,
   type DnsStatus, type DnsNs, type DnsCacheEntry, type DnsLogEntry } from './pages/dns.js';
+import { geoStatusText, geoSrcText, geoCheckText } from './pages/geo.js';
 import './ryba-card.js';
 import './ryba-stat.js';
 import './ryba-modal.js';
@@ -10,11 +15,7 @@ import './ryba-modal.js';
 /* ---------- API ---------- */
 
 
-interface Upstream { id: number; name: string; type: string; host: string; port: number; enabled: boolean; username?: string }
-interface Rule { id: number; priority: number; domain_pattern: string; ip_cidr: string; geo_ip: string; geo_site: string; port: number; protocol: string; upstream_id: number }
-interface DayStat { day: string; bytes_up: number; bytes_down: number; sessions: number }
-interface Metrics { total_sessions?: number; errors?: number; dropped?: number }
-interface Session { protocol: string; client_ip: string; target_host: string; target_port: number; status: number | string; bytes_up: number; bytes_down: number }
+
 
 let dnsStatus: DnsStatus | null = null, dnsNs: DnsNs[] = [];
 
@@ -53,13 +54,12 @@ async function loadAll(){
   sessPage = unwrapPage(ms); sessFilter.client=''; sessFilter.target='';
   const m = mm.data || {};
   daily = (md.data || []).slice().sort((a,b) => a.day < b.day ? -1 : 1);
-  const today = daily[daily.length-1] || { bytes_up: 0, bytes_down: 0 };
+  const v = heroValues(m, daily);
   const hero = document.querySelectorAll('#heroCard ryba-stat');
-  const bw = daily.map(d => (+d.bytes_up) + (+d.bytes_down));
-  if (hero[0]) { hero[0].setAttribute('value', String(m.total_sessions ?? 0)); hero[0].setAttribute('trend', '累计会话'); }
-  if (hero[1]) { hero[1].setAttribute('value', fmtBytes(today.bytes_up)); hero[1].setAttribute('spark', sparkline(daily.map(d => +d.bytes_up))); }
-  if (hero[2]) { hero[2].setAttribute('value', fmtBytes(today.bytes_down)); hero[2].setAttribute('spark', sparkline(bw)); }
-  if (hero[3]) { hero[3].setAttribute('value', String((+m.errors||0) + (+m.dropped||0))); hero[3].setAttribute('trend', (+m.dropped||0) + ' 丢弃'); }
+  if (hero[0]) { hero[0].setAttribute('value', v.sessions); hero[0].setAttribute('trend', '累计会话'); }
+  if (hero[1]) { hero[1].setAttribute('value', v.up); hero[1].setAttribute('spark', v.upSpark); }
+  if (hero[2]) { hero[2].setAttribute('value', v.down); hero[2].setAttribute('spark', v.bwSpark); }
+  if (hero[3]) { hero[3].setAttribute('value', v.errors); hero[3].setAttribute('trend', v.trend); }
   renderUpstreams(); renderRules(); renderSessions(); renderHeatmap();
 }
 
@@ -73,12 +73,12 @@ async function refreshLive(){
     const m = mm.data || {};
     daily = (md.data || []).slice().sort((a,b) => a.day < b.day ? -1 : 1);
     sessPage = unwrapPage(ms);
+    const v = heroValues(m, daily);
     const hero = document.querySelectorAll('#heroCard ryba-stat');
-    const today = daily[daily.length-1] || { bytes_up: 0, bytes_down: 0 };
-    if (hero[0]) hero[0].setAttribute('value', String(m.total_sessions ?? 0));
-    if (hero[1]) hero[1].setAttribute('value', fmtBytes(today.bytes_up));
-    if (hero[2]) hero[2].setAttribute('value', fmtBytes(today.bytes_down));
-    if (hero[3]) hero[3].setAttribute('value', String((+m.errors||0) + (+m.dropped||0)));
+    if (hero[0]) hero[0].setAttribute('value', v.sessions);
+    if (hero[1]) hero[1].setAttribute('value', v.up);
+    if (hero[2]) hero[2].setAttribute('value', v.down);
+    if (hero[3]) hero[3].setAttribute('value', v.errors);
     renderSessions(); renderHeatmap();
   } catch(e){ /* keep old data on poll failure */ }
 }
@@ -89,18 +89,7 @@ function renderUpstreams() {
   tb.innerHTML = '';
   upstreams.forEach((u) => {
     const tr = document.createElement('tr');
-    const addr = u.host ? `${esc(u.host)}${u.port ? ':'+u.port : ''}` : '—';
-    tr.innerHTML = `
-      <td>${esc(u.name)}</td>
-      <td><span class="pill proto">${esc(u.type)}</span></td>
-      <td class="num">${addr}</td>
-      <td><span class="pill ${u.enabled?'on':'off'}">${u.enabled?'启用':'停用'}</span></td>
-      <td class="row-actions">
-        <button data-test="${u.id}">测试</button>
-        <button data-toggle="${u.id}">${u.enabled?'停用':'启用'}</button>
-        <button data-edit="${u.id}">编辑</button>
-        <button class="danger" data-del="${u.id}">删除</button>
-      </td>`;
+    tr.innerHTML = upstreamRowHtml(u);
     tr.querySelector('[data-test]').addEventListener('click', async (e) => {
       const btn = e.target; btn.disabled = true; btn.textContent = '测试中…';
       try {
@@ -127,19 +116,12 @@ function renderSessions() {
   tb.innerHTML = '';
   if (!sessPage.rows.length) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td colspan="6"><div class="empty">暂无会话数据</div></td>`;
+    tr.innerHTML = emptyRowHtml(6, '暂无会话数据');
     tb.appendChild(tr);
   }
   sessPage.rows.forEach(s => {
     const tr = document.createElement('tr');
-    const active = s.status === 0 || s.status === '0';
-    tr.innerHTML = `
-      <td><span class="pill proto">${esc(s.protocol)}</span></td>
-      <td class="num">${esc(s.client_ip)}</td>
-      <td>${esc(s.target_host)}:${s.target_port}</td>
-      <td><span class="pill ${active?'on':'off'}">${active?'活跃':'已关闭'}</span></td>
-      <td class="num">${fmtBytes(s.bytes_up)}</td>
-      <td class="num">${fmtBytes(s.bytes_down)}</td>`;
+    tr.innerHTML = sessionRowHtml(s);
     tb.appendChild(tr);
   });
   let pager = document.getElementById('sessPager');
@@ -149,11 +131,7 @@ function renderSessions() {
     pager.style.cssText = 'display:flex;gap:8px;align-items:center;margin-top:10px;font-size:.8rem;color:var(--ink-soft);';
     document.querySelector('#sessionTable').after(pager);
   }
-  const pages = Math.max(1, Math.ceil(sessPage.total / sessPage.limit));
-  const cur = Math.floor(sessPage.offset / sessPage.limit) + 1;
-  pager.innerHTML = `<button class="btn ghost sm" id="pgPrev" ${sessPage.offset<=0?'disabled':''}>上一页</button>
-    <span class="num">${cur} / ${pages} · 共 ${sessPage.total} 条</span>
-    <button class="btn ghost sm" id="pgNext" ${sessPage.offset+sessPage.limit>=sessPage.total?'disabled':''}>下一页</button>`;
+  pager.innerHTML = pagerHtml(sessPage);
   document.getElementById('pgPrev').addEventListener('click', () => { sessPage.offset = Math.max(0, sessPage.offset - sessPage.limit); refreshLive(); });
   document.getElementById('pgNext').addEventListener('click', () => { sessPage.offset += sessPage.limit; refreshLive(); });
 }
@@ -169,18 +147,7 @@ function renderRules() {
   empty.style.display='none'; table.style.display='';
   rules.forEach((r) => {
     const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td class="num">${r.priority}</td>
-      <td>${esc(r.domain_pattern) || '—'}</td>
-      <td class="num">${esc(r.ip_cidr) || '—'}</td>
-      <td class="num">${r.port || '*'}</td>
-      <td><span class="pill proto">${esc(r.protocol)}</span></td>
-      <td>${esc(upName(upstreams, r.upstream_id))}</td>
-      <td class="num">${geoLabel(r)}</td>
-      <td class="row-actions">
-        <button data-edit="${r.id}">编辑</button>
-        <button class="danger" data-del="${r.id}">删除</button>
-      </td>`;
+    tr.innerHTML = ruleRowHtml(r, upstreams);
     tr.querySelector('[data-edit]').addEventListener('click', () => openRuleEditor(r.id));
     tr.querySelector('[data-del]').addEventListener('click', () => confirmDelete(async () => {
       try { await api(`/api/rules/${r.id}`, { method: 'DELETE' }); await reloadRules(); toast('已删除规则'); }
@@ -192,11 +159,8 @@ function renderRules() {
 async function reloadRules(){ const j = await api('/api/rules'); rules = j.data || []; renderRules(); }
 async function reloadGeoStatus(){
   try { const j = await api('/api/geo/status'); const d = j.data || {};
-    const g = d.geoip || {}, s = d.geosite || {};
-    const fmt = (x, n) => (x.exists ? `${n}: ${(x.size/1048576).toFixed(1)}MB / ${x.cn_count} 条` : `${n}: 未下载`);
-    document.getElementById('geoStatus').textContent = `${fmt(g, 'geoip')}　${fmt(s, 'geosite')}`;
-    document.getElementById('geoSrc').textContent = `目录: ${d.dir || '?'}${d.proxy ? ' 代理: ' + d.proxy : '（直连下载）'}\
-源: ${(g.url||'').replace('https://','')}`;
+    document.getElementById('geoStatus').textContent = geoStatusText(d);
+    document.getElementById('geoSrc').textContent = geoSrcText(d);
   } catch(err){ document.getElementById('geoStatus').textContent = 'IP 库状态获取失败'; }
 }
 document.getElementById('geoDownload').addEventListener('click', async () => {
@@ -208,11 +172,7 @@ document.getElementById('geoDownload').addEventListener('click', async () => {
 document.getElementById('geoCheck').addEventListener('click', async () => {
   const h = document.getElementById('geoHost').value.trim(); if (!h) { toast('请输入域名或 IP'); return; }
   try { const j = await api('/api/geo/check?host=' + encodeURIComponent(h)); const d = j.data;
-    document.getElementById('geoResult').textContent =
-      `解析 IP: ${(d.ips||[]).join(', ')||'—'}
-IP 归属: ${cnText(d.geoip_cn)}　域名归属: ${cnText(d.geosite_cn)}${d.db_loaded === false ? '\
-⚠ IP 库未加载：请先点 下载/更新' : ''}
-命中规则: ${d.matched_rule}　出口: ${d.upstream.name||('id('+d.upstream.id+')')}`;
+    document.getElementById('geoResult').textContent = geoCheckText(d);
   } catch(err){ toast('检测失败：' + err.message); }
 });
 
@@ -228,7 +188,7 @@ function renderHeatmap() {
     const cell = document.createElement('div');
     cell.className = 'cell';
     const frac = ((+d.bytes_up) + (+d.bytes_down)) / max;
-    const lvl = frac < 0.25 ? 0 : frac < 0.5 ? 1 : frac < 0.8 ? 2 : 3;
+    const lvl = heatLevel(frac);
     cell.style.background = levels[lvl];
     const mb = (((+d.bytes_up) + (+d.bytes_down)) / 1048576).toFixed(1);
     cell.addEventListener('mouseenter', () => {
@@ -279,7 +239,7 @@ function openRuleEditor(id) {
   const set = (n,v) => { const el = m.querySelector(`[name="${n}"]`); if(el) el.value = v; };
   document.getElementById('ruleModalTitle').textContent = id < 0 ? '添加路由规则' : '编辑路由规则';
   const usel = m.querySelector('[name="upstream_id"]');
-  usel.innerHTML = upstreams.map(u => `<option value="${u.id}">${esc(u.name)} (${u.id})</option>`).join('') || '<option value="0">direct</option>';
+  usel.innerHTML = upstreamOptionsHtml(upstreams);
   usel.value = id < 0 ? (upstreams.length ? upstreams[0].id : 0) : ((rules.find(x => x.id === id) || {}).upstream_id || 0);
   if (id < 0) { set('domain_pattern',''); set('ip_cidr',''); set('port',''); set('priority',100); set('protocol','any'); set('geo_ip',''); set('geo_site',''); }
   else {

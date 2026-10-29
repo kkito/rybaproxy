@@ -7,3 +7,8 @@ export { RybaModal } from './ryba-modal.js';
 export { api, unwrapPage, type ApiEnvelope, type Page } from './api.js';
 export { esc, fmtBytes, sparkline, cnText, upName, geoLabel } from './format.js';
 export { dnsStatusHtml, nsTableHtml, cacheTableHtml, logsTableHtml } from './pages/dns.js';
+export { geoDbText, geoStatusText, geoSrcText, geoCheckText } from './pages/geo.js';
+export { upstreamRowHtml, upstreamAddr } from './upstreams.js';
+export { ruleRowHtml } from './rules.js';
+export { sessionRowHtml, emptyRowHtml, pagerHtml, isActive } from './sessions.js';
+export { heatLevel, heroValues } from './dashboard.js';
