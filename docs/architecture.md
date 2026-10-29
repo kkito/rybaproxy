@@ -1,3 +1,11 @@
+---
+id: ryba-architecture
+type: architecture-design
+status: active
+title: rybaproxy 架构
+parent: ryba-goal
+---
+
 # 架构
 
 ## 1. 总体设计
