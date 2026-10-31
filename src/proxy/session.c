@@ -44,3 +44,13 @@ void session_finish(session_t *s, session_status_t status, int err, const char *
     s->ended_at = time(NULL);
     if (msg) snprintf(s->error_msg, sizeof s->error_msg, "%s", msg);
 }
+
+void session_settle_http(session_t *s, int http_status) {
+    if (!s || s->status != SESS_ACTIVE) return;
+    int failed = http_status >= 400;
+    char msg[32];
+    snprintf(msg, sizeof msg, "http %d", http_status);
+    /* error_code 语义是“0=无错”，成功路径不能把 200 当成错误码写进去 */
+    session_finish(s, failed ? SESS_ERROR : SESS_DONE, failed ? http_status : 0,
+                   failed ? msg : NULL);
+}

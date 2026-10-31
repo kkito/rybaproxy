@@ -42,4 +42,9 @@ void session_set_target(session_t *s, const char *host, uint16_t port);
 void session_set_method(session_t *s, const char *method);
 void session_finish(session_t *s, session_status_t status, int err, const char *msg);
 
+/* 结算“响应已发出但会话仍 ACTIVE”的会话（HTTP 错误路径 400/407/431/502）。
+ * 已经结算过的（隧道正常关闭/超时）不动；未结算的按 HTTP 状态码定性，
+ * 否则 DB/面板会把失败会话永远当成“活跃”（error_code 也丢）。 */
+void session_settle_http(session_t *s, int http_status);
+
 #endif

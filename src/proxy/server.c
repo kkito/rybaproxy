@@ -125,7 +125,9 @@ static int upstream_connect_profile(upstream_profile_t *up, const char *host, ui
 /* ---------- HTTP handling ---------- */
 
 static void http_finish(conn_t *c, int status) {
-    (void)status;
+    /* status 是本次响应码：错误路径（400/407/431/502）走到这里时会话还 ACTIVE，
+     * 必须先结算再落库，否则 DB 里就是永远"活跃"、error_code=0 的幽灵会话。 */
+    if (c->session) session_settle_http(c->session, status);
     if (c->session) {
         if (c->session->bev_client) bufferevent_setcb(c->session->bev_client, NULL, NULL, NULL, NULL);
         if (c->session->bev_upstream) bufferevent_setcb(c->session->bev_upstream, NULL, NULL, NULL, NULL);
@@ -158,7 +160,7 @@ static void http_read_cb(struct bufferevent *bev, void *arg) {
         if (ptr.pos < 0) {
             if (evbuffer_get_length(in) > 16384) {
                 { const char *r="HTTP/1.1 431 Request Header Fields Too Large\r\nConnection: close\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
-                http_finish(c, 0);
+                http_finish(c, 431);
             }
             return;
         }
@@ -172,7 +174,7 @@ static void http_read_cb(struct bufferevent *bev, void *arg) {
         http_request_info_t info;
         if (http_proxy_parse_request(c->http.reqbuf, header_len, &info) != 0) {
             { const char *r="HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
-            http_finish(c, 0);
+            http_finish(c, 400);
             return;
         }
         session_set_target(s, info.host, info.port);
@@ -196,7 +198,7 @@ static void http_read_cb(struct bufferevent *bev, void *arg) {
                 const char *resp = "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"rybaproxy\"\r\nConnection: close\r\n\r\n";
                 int fd = bufferevent_getfd(bev);
                 if (fd >= 0) { ssize_t _ = write(fd, resp, strlen(resp)); (void)_; }
-                http_finish(c, 0);
+                http_finish(c, 407);
                 return;
             }
         }
@@ -205,7 +207,7 @@ static void http_read_cb(struct bufferevent *bev, void *arg) {
         upstream_profile_t *up = pick_upstream(srv, info.host, info.port, PROTO_HTTP, s->client_ip);
         if (!up) {
             { const char *r="HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
-            http_finish(c, 0);
+            http_finish(c, 502);
             return;
         }
         /* 先记下决定走的上游：连接失败时统计的也是真实尝试过的线路，
@@ -225,7 +227,7 @@ static void http_read_cb(struct bufferevent *bev, void *arg) {
         }
         if (fd < 0) {
             { const char *r="HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
-            http_finish(c, 0);
+            http_finish(c, 502);
             return;
         }
         set_nonblock(fd);
