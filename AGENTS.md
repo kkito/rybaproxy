@@ -7,7 +7,7 @@
 - 先写失败的测试（RED），**亲眼看到它按预期原因失败**，再写最少量的生产代码（GREEN），最后重构（REFACTOR）。
 - 禁止事后补测试、禁止"先实现再补单测"——测试一次通过证明不了任何事。
 - bug 修复必须先有复现该 bug 的失败测试，修完后该测试转为回归测试。
-- 收尾检查：`cmake --build build -j4 && ctest --test-dir build` 必须 12/12 全绿才可提交。
+- 收尾检查：`cmake --build build -j4 && ctest --test-dir build` 必须全部通过（不许有 skip、不许有 failed）才可提交。
 
 ## 2. 无状态函数优先
 

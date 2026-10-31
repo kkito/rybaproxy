@@ -76,4 +76,8 @@
 
 ## 6. 静态资源嵌入
 
-使用脚本将 `web/static/*` 转为 C 字节数组编译进二进制，避免运行时依赖文件路径。开发模式可从 `--web-root` 读取文件。
+页面在构建期由 `scripts/build_web.cjs`（esbuild 打 `web/src/app.ts`）+ `scripts/gen_web_page.js`
+（把 JS 与 `web/style.css` 内联进 `web/index.html`）生成 `build/generated/web_page_gen.h` 里的
+`WEB_PAGE_HTML_GEN` 字节串，编译进二进制，运行时不依赖任何静态文件路径。
+
+构建链路与依赖见 `build.md` §4、`webhtml.md`。
