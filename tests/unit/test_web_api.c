@@ -1,12 +1,16 @@
 #include <cmocka.h>
 #include <event2/event.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/socket.h>
 #include <unistd.h>
 #include "rybaproxy/db.h"
 #include "rybaproxy/geo.h"
 #include "rybaproxy/session.h"
+#include "rybaproxy/web.h"
 #include "rybaproxy/web_api.h"
 #include "rybaproxy/version.h"
 #include "rybaproxy/router.h"
@@ -235,6 +239,61 @@ static void test_healthz_carries_version(void **state) {
     assert_true(strlen(RYBA_BUILD_TIME) > 0);
 }
 
+/* 最小 HTTP 客户端：发一个请求读完整响应（只给单测用，端口走本地回环）。 */
+static int http_req(int port, const char *method, const char *path, const char *body,
+                    char *out, size_t outsz) {
+    int fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (fd < 0) return -1;
+    struct sockaddr_in a;
+    memset(&a, 0, sizeof a);
+    a.sin_family = AF_INET;
+    a.sin_port = htons((uint16_t)port);
+    a.sin_addr.s_addr = htonl(INADDR_LOOPBACK);
+    if (connect(fd, (struct sockaddr *)&a, sizeof a) != 0) { close(fd); return -1; }
+    char req[2048];
+    int n = snprintf(req, sizeof req,
+                     "%s %s HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n"
+                     "Content-Length: %zu\r\nConnection: close\r\n\r\n%s",
+                     method, path, body ? strlen(body) : 0, body ? body : "");
+    if (n <= 0 || (size_t)n >= sizeof req) { close(fd); return -1; }
+    if (send(fd, req, (size_t)n, 0) != n) { close(fd); return -1; }
+    size_t got = 0;
+    ssize_t r;
+    while (got + 1 < outsz && (r = recv(fd, out + got, outsz - 1 - got, 0)) > 0) got += (size_t)r;
+    out[got] = '\0';
+    close(fd);
+    return 0;
+}
+
+/* 回归：POST /api/rules 的 JSON body 必须真正读进 handler。
+ * 曾经 read_body 的 bufsz 传成 sizeof(char*)（8），任何 >7 字节的 body 都被当空
+ * → 所有写接口（rules/upstreams/settings）恒返回 BAD_JSON，Web 面板完全没法写。 */
+static void test_rules_post_body_reaches_handler(void **state) {
+    (void)state;
+    server_ctx_t srv;
+    memset(&srv, 0, sizeof srv);
+    router_init(&srv.router, "direct", true);
+    int port = 20000 + (int)(getpid() % 20000);
+    srv.web_ctx = web_start(&srv, port);
+    assert_non_null(srv.web_ctx);
+
+    char out[4096];
+    assert_int_equal(http_req(port, "POST", "/api/rules",
+                              "{\"name\":\"t-post-body\",\"priority\":5,\"geo_ip\":\"cn\",\"upstream_id\":0}",
+                              out, sizeof out), 0);
+    assert_non_null(strstr(out, " 201 "));
+    assert_non_null(strstr(out, "\"id\""));
+
+    char out2[8192];
+    assert_int_equal(http_req(port, "GET", "/api/rules", NULL, out2, sizeof out2), 0);
+    /* 列表不输出 name（UI 不用它），这里断言条件与优先级真的解析进来了 */
+    assert_non_null(strstr(out2, "\"geo_ip\":\"cn\""));
+    assert_non_null(strstr(out2, "\"priority\":5"));
+
+    web_stop(srv.web_ctx);
+    router_free(&srv.router);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_envelope_ok_shape),
@@ -254,6 +313,7 @@ int main(void) {
         cmocka_unit_test_setup_teardown(test_session_get_by_id, setup, teardown),
         cmocka_unit_test_setup_teardown(test_settings_roundtrip, setup, teardown),
         cmocka_unit_test(test_healthz_carries_version),
+        cmocka_unit_test_setup_teardown(test_rules_post_body_reaches_handler, setup, teardown),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

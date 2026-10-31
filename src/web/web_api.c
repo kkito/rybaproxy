@@ -299,6 +299,10 @@ static void qstr(const char *query, const char *name, char *out, size_t outsz) {
     mg_get_var(query, strlen(query), name, out, outsz);
 }
 
+/* 请求体上限：body 缓冲是 malloc 出来的指针，调用点必须传这个容量，
+ * 传 sizeof(body) 只会得到 8 —— 那样任何 >7 字节的 JSON 都被当空 body。 */
+#define W_BODY_MAX 4096
+
 static void read_body(struct mg_connection *conn, char *buf, size_t bufsz) {
     const struct mg_request_info *ri = mg_get_request_info(conn);
     long long want = ri ? ri->content_length : 0;
@@ -320,7 +324,7 @@ static void w_auto_free(void *p) { void *q = *(void **)p; if (q) free(q); }
 
 void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char *uri, const char *method, const char *query) {
     LOG_DEBUG("web %s %s", method, uri);
-    char *body W_AUTO_FREE = malloc(4096);
+    char *body W_AUTO_FREE = malloc(W_BODY_MAX);
     char *tmp W_AUTO_FREE = malloc(65536);
     size_t tmpsz = 65536;
     if (!body || !tmp) { send_envelope(conn, 500, web_envelope_json(NULL, "INTERNAL", "alloc")); return; }
@@ -362,7 +366,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             return;
         }
         if (strcmp(method, "POST") == 0) {
-            read_body(conn, body, sizeof body);
+            read_body(conn, body, W_BODY_MAX);
             cJSON *j = cJSON_Parse(body);
             if (!j) { send_envelope(conn, 400, web_envelope_json(NULL, "BAD_JSON", "bad json")); return; }
             pthread_mutex_lock(&srv->lock);
@@ -393,7 +397,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
         if (strcmp(method, "PUT") == 0) {
             int id = parse_id(uri, "/api/upstreams", query);
             if (id < 0) { send_envelope(conn, 400, web_envelope_json(NULL, "BAD_REQUEST", "missing id")); return; }
-            read_body(conn, body, sizeof body);
+            read_body(conn, body, W_BODY_MAX);
             char *out = NULL; int status = 200;
             web_upstreams_update(srv, id, body, &out, &status);
             send_envelope(conn, status, out);
@@ -442,7 +446,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
             return;
         }
         if (strcmp(method, "POST") == 0) {
-            read_body(conn, body, sizeof body);
+            read_body(conn, body, W_BODY_MAX);
             cJSON *j = cJSON_Parse(body);
             if (!j) { send_envelope(conn, 400, web_envelope_json(NULL, "BAD_JSON", "bad json")); return; }
             rule_t r; memset(&r, 0, sizeof r);
@@ -493,7 +497,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
         }
         if (strcmp(method, "PUT") == 0) {
             int id = parse_id(uri, "/api/rules", query);
-            read_body(conn, body, sizeof body);
+            read_body(conn, body, W_BODY_MAX);
             cJSON *j = cJSON_Parse(body);
             if (!j) { send_envelope(conn, 400, web_envelope_json(NULL, "BAD_JSON", "bad json")); return; }
             pthread_mutex_lock(&srv->lock);
@@ -730,7 +734,7 @@ void web_api_dispatch(struct mg_connection *conn, server_ctx_t *srv, const char 
     }
     if (strncmp(uri, "/api/settings", 13) == 0) {
         if (strcmp(method, "PUT") == 0) {
-            read_body(conn, body, sizeof body);
+            read_body(conn, body, W_BODY_MAX);
             cJSON *j = cJSON_Parse(body);
             if (!j || !cJSON_IsObject(j)) {
                 if (j) cJSON_Delete(j);
