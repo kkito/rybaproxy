@@ -1,5 +1,6 @@
 #include "rybaproxy/upstream.h"
 #include "rybaproxy/dns.h"
+#include "rybaproxy/http_proxy.h"
 
 #include <arpa/inet.h>
 #include <errno.h>
@@ -82,6 +83,9 @@ int upstream_connect_http(const upstream_profile_t *up, const char *target_host,
     int fd = tcp_connect_host(up->host, up->port, 10);
     if (fd < 0) return -1;
     char req[1024];
+    char target[320];
+    /* IPv6 目标必须带方括号，否则 CONNECT 2401:67c::1:443 是坏请求 */
+    format_hostport(target_host, target_port, target, sizeof target);
     int rlen;
     if (up->username[0]) {
         char creds[256];
@@ -103,12 +107,11 @@ int upstream_connect_http(const upstream_profile_t *up, const char *target_host,
         }
         b64[j] = '\0';
         rlen = snprintf(req, sizeof req,
-            "CONNECT %s:%u HTTP/1.1\r\nHost: %s:%u\r\nProxy-Authorization: Basic %s\r\n\r\n",
-            target_host, target_port, target_host, target_port, b64);
+            "CONNECT %s HTTP/1.1\r\nHost: %s\r\nProxy-Authorization: Basic %s\r\n\r\n",
+            target, target, b64);
     } else {
         rlen = snprintf(req, sizeof req,
-            "CONNECT %s:%u HTTP/1.1\r\nHost: %s:%u\r\n\r\n",
-            target_host, target_port, target_host, target_port);
+            "CONNECT %s HTTP/1.1\r\nHost: %s\r\n\r\n", target, target);
     }
     if (send(fd, req, rlen, 0) < 0) { close(fd); return -1; }
     char resp[4096];
