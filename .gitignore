@@ -1,8 +1,8 @@
 build/
+build-*/
 node_modules/
 vcpkg_installed/
 *.o
 stats.db
-build*
 stats.db*
 web/node_modules/
