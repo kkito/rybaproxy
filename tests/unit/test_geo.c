@@ -184,6 +184,31 @@ static void test_host_uses_injected_resolver(void **s) {
     geo_set_resolver(NULL);
 }
 
+/* RED: geo_site_is_cn 与 geo_host_is_cn 共用 LRU 键 "host:<低>"。
+ * 规则按优先级先跑 geo_site（写 0 = 不在 cn 列表），再跑 geo_ip 时
+ * geo_host_is_cn 直接读到那个 0，于是「域名不在 geosite-cn、但解析到 CN IP」
+ * 的流量被判成非 CN → 落到默认上游（代理）。实测 wx.qlogo.cn / www.bing.com
+ * 这类国内 CDN 就是这样被送出去的。 */
+static void test_site_then_host_cn_no_key_collision(void **s) {
+    (void)s;
+    write_dat("geoip.dat", kIpEntry, sizeof kIpEntry);
+    write_dat("geosite.dat", kSiteEntry, sizeof kSiteEntry);
+    assert_int_equal(geo_load(g_dir), 0);
+    geo_set_cache_size(512);
+    geo_set_resolver(fake_resolver); /* fake → 1.2.3.9，geo 表判 CN */
+    g_resolve_calls = 0;
+    /* 不在 geosite-cn 列表里 */
+    assert_int_equal(geo_site_is_cn("cdn.example.com"), 0);
+    /* 但解析到 CN IP：必须判 1，而且要真的去解析一次（不能吃到 site 的缓存 0） */
+    assert_int_equal(geo_host_is_cn("cdn.example.com"), 1);
+    assert_int_equal(g_resolve_calls, 1);
+    /* 反向顺序同样不能互相污染 */
+    assert_int_equal(geo_host_is_cn("cdn2.example.com"), 1);
+    assert_int_equal(geo_site_is_cn("cdn2.example.com"), 0);
+    assert_int_equal(geo_host_is_cn("cdn2.example.com"), 1);
+    geo_set_resolver(NULL);
+}
+
 static void test_db_unloaded(void **s) {
     (void)s;
     /* 空库必须报未知(-1)，不许撒谎报非CN(0)：baidu 误判根因 */
@@ -286,6 +311,7 @@ int main(void) {
         cmocka_unit_test_setup_teardown(test_private_is_cn, setup, teardown),
         cmocka_unit_test_setup_teardown(test_invalid_input, setup, teardown),
         cmocka_unit_test_setup_teardown(test_db_unloaded, setup, teardown),
+        cmocka_unit_test_setup_teardown(test_site_then_host_cn_no_key_collision, setup, teardown),
         cmocka_unit_test_setup_teardown(test_load_wire_dat, setup, teardown),
         cmocka_unit_test_setup_teardown(test_host_no_dns_when_db_unloaded, setup, teardown),
         cmocka_unit_test_setup_teardown(test_host_uses_injected_resolver, setup, teardown),

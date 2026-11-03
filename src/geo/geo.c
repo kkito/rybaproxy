@@ -748,7 +748,10 @@ int geo_site_is_cn(const char *host) {
     if (is_lit) low[0] = '\0';
     else if (geo_norm_host(host, low, sizeof low) != 0) return -1;
     char lkey[GEO_LRU_KEY_MAX];
-    snprintf(lkey, sizeof lkey, "host:%s", is_lit ? host : low);
+    /* 键前缀必须与 geo_host_is_cn 的 "host:" 分开：两者语义不同
+     * （"在 geosite-cn 列表" vs "解析到 CN IP"），共用一个键会让
+     * 先跑的 site 判定把 0 写进缓存、后跑的 geo_ip 直接读错。 */
+    snprintf(lkey, sizeof lkey, "site:%s", is_lit ? host : low);
     pthread_mutex_lock(&g_lock);
     time_t now = time(NULL);
     int cached = lru_get(lkey, now);
