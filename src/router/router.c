@@ -58,15 +58,24 @@ static int geo_cond_matches(const char *cond, int v) {
 }
 
 /* 条件取值（纯分发）：lan 族走内网判定，其余走国别判定。
- * 空条件返回 1 让调用方短路——这里绝不去解析/查表。 */
-static int geo_cond_value(const char *cond, const char *host) {
+ * 空条件返回 1 让调用方短路——这里绝不去解析/查表。
+ * probe 顺手记下「实际查过什么」，供日志用；不额外发任何查询。 */
+typedef struct { int site, host, lan; } geo_probe_t;
+
+static int geo_cond_value(const char *cond, const char *host, geo_probe_t *probe) {
     if (!cond || !cond[0]) return 1;
-    if (strcmp(cond, "lan") == 0 || strcmp(cond, "!lan") == 0)
-        return geo_host_is_lan(host);
-    return geo_host_is_cn(host);
+    if (strcmp(cond, "lan") == 0 || strcmp(cond, "!lan") == 0) {
+        int v = geo_host_is_lan(host);
+        if (probe && probe->lan < 0) probe->lan = v;
+        return v;
+    }
+    int v = geo_host_is_cn(host);
+    if (probe && probe->host < 0) probe->host = v;
+    return v;
 }
 
-static int rule_matches(const rule_t *rule, const char *host, int port, protocol_t proto, const char *client_ip) {
+static int rule_matches(const rule_t *rule, const char *host, int port, protocol_t proto,
+                        const char *client_ip, geo_probe_t *probe) {
     if (!rule->enabled) return 0;
     if (rule->port != 0 && rule->port != port) return 0;
     if (rule->protocol != 0 && rule->protocol != proto) return 0;
@@ -78,24 +87,49 @@ static int rule_matches(const rule_t *rule, const char *host, int port, protocol
         /* if domain rule also has cidr, require both; ip-only rules should leave domain empty */
     }
     /* 条件为空直接跳过查询：geo_host_is_cn 含 DNS，空条件调用即浪费一次解析 */
-    if (rule->geo_ip[0] && !geo_cond_matches(rule->geo_ip, geo_cond_value(rule->geo_ip, host))) return 0;
-    if (rule->geo_site[0] && !geo_cond_matches(rule->geo_site, geo_site_is_cn(host))) return 0;
+    if (rule->geo_ip[0] && !geo_cond_matches(rule->geo_ip, geo_cond_value(rule->geo_ip, host, probe))) return 0;
+    if (rule->geo_site[0]) {
+        int v = geo_site_is_cn(host);
+        if (probe && probe->site < 0) probe->site = v;
+        if (!geo_cond_matches(rule->geo_site, v)) return 0;
+    }
     return 1;
 }
 
-int router_select(const router_t *r, const char *host, int port, protocol_t proto, const char *client_ip) {
+int router_select_ex(const router_t *r, const char *host, int port, protocol_t proto,
+                     const char *client_ip, router_match_t *out) {
+    if (out) {
+        memset(out, 0, sizeof *out);
+        out->rule_id = -1;
+        out->geo_site = out->geo_host = out->geo_lan = -1;
+    }
+    if (!r) return -1;
+    geo_probe_t probe = { -1, -1, -1 };
     int best_idx = -1;
     int best_prio = -1;
     for (int i = 0; i < r->count; i++) {
         const rule_t *rule = &r->rules[i];
-        if (!rule_matches(rule, host, port, proto, client_ip)) continue;
+        if (!rule_matches(rule, host, port, proto, client_ip, &probe)) continue;
         if (rule->priority > best_prio || (rule->priority == best_prio && (best_idx == -1 || rule->id < r->rules[best_idx].id))) {
             best_prio = rule->priority;
             best_idx = i;
         }
     }
+    if (out) {
+        out->geo_site = probe.site;
+        out->geo_host = probe.host;
+        out->geo_lan = probe.lan;
+        if (best_idx >= 0) {
+            out->rule_id = r->rules[best_idx].id;
+            snprintf(out->rule_name, sizeof out->rule_name, "%s", r->rules[best_idx].name);
+        }
+    }
     if (best_idx >= 0) return r->rules[best_idx].upstream_id;
     return -1; /* caller uses default */
+}
+
+int router_select(const router_t *r, const char *host, int port, protocol_t proto, const char *client_ip) {
+    return router_select_ex(r, host, port, proto, client_ip, NULL);
 }
 
 int router_add_rule_persist(router_t *r, const char cols[11][96], int *assigned_id) {
@@ -120,19 +154,11 @@ int router_add_rule_persist(router_t *r, const char cols[11][96], int *assigned_
     return 0;
 }
 
+/* 只关心命中哪条规则：本质是 router_select_ex 的一个投影，别再抄一遍匹配循环 */
 int router_select_rule_id(const router_t *r, const char *host, int port, protocol_t proto, const char *client_ip) {
-    int best_idx = -1;
-    int best_prio = -1;
-    for (int i = 0; i < r->count; i++) {
-        const rule_t *rule = &r->rules[i];
-        if (!rule_matches(rule, host, port, proto, client_ip)) continue;
-        if (rule->priority > best_prio || (rule->priority == best_prio && (best_idx == -1 || rule->id < r->rules[best_idx].id))) {
-            best_prio = rule->priority;
-            best_idx = i;
-        }
-    }
-    if (best_idx >= 0) return r->rules[best_idx].id;
-    return -1;
+    router_match_t m;
+    router_select_ex(r, host, port, proto, client_ip, &m);
+    return m.rule_id;
 }
 
 /* domain matching */

@@ -22,40 +22,37 @@ parent: ryba-goal
 src/
   main.c                 # 入口、信号、启动
   core/
-    config.c/.h          # 配置加载/校验/热重载
-    log.c/.h             # 日志
-    event_loop.c/.h      # libevent 封装
-    queue.c/.h           # 有界队列
-    mempool.c/.h         # 内存池（可选）
+    config.c             # 配置加载/校验
+    log.c                # 分级日志（trace..fatal）
+    reqlog.c             # 单条请求日志的纯格式化（路由/连接/结束三行）
+    dns.c                # getaddrinfo 封装（可注入 resolver，单测零网络）
+    strutil.c            # 字符串/大小写查找工具
+    daemon.c             # 后台化
+    pidfile.c            # pid 文件
+    startup_info.c       # 启动横幅
   net/
-    socket.c/.h          # socket 工具、TCP connect、DNS
-    tls.c/.h             # 可选 TLS（v2）
+    connpool.c           # 连接线程池：把阻塞的 DNS/connect/握手搬出事件循环
+  geo/
+    geo.c                # geoip/geosite 判定 + LRU 缓存（键按语义分前缀）
   proxy/
-    http_proxy.c/.h      # HTTP 代理（CONNECT + 普通请求）
-    socks5.c/.h          # SOCKS5
-    session.c/.h         # 会话结构、双向 relay
-    relay.c/.h           # bufferevent 对接、字节计数
+    server.c             # 监听、accept、路由决策、异步连上游、日志胶水
+    http_proxy.c         # HTTP 请求行/头解析（纯函数）
+    socks5.c             # SOCKS5 报文解析与应答构造（纯函数）
+    session.c            # 会话结构、结算语义
+    relay.c              # 双向 relay（bufferevent）、字节计数
   upstream/
-    upstream.c/.h        # 抽象接口
-    direct.c/.h          # 直连
-    http_upstream.c/.h   # HTTP 代理上游
-    socks5_upstream.c/.h # SOCKS5 上游
+    upstream.c           # direct/HTTP CONNECT/SOCKS5 建连与握手 + 路由落地（纯函数）
   router/
-    router.c/.h          # 规则匹配引擎
-    rules.c/.h           # 规则 CRUD（内存 + DB）
-    matcher.c/.h         # 域名/IP/CIDR/端口匹配
+    router.c             # 规则匹配引擎（含 geo 条件、诊断信息 router_select_ex）
   stats/
-    stats.c/.h           # 事件采集、聚合
-    stats_writer.c/.h    # 异步 SQLite 写入线程
-    retention.c/.h       # 3 个月清理
+    stats.c              # 事件采集、聚合、异步 SQLite 写入
   web/
-    httpd.c/.h           # 基于 evhttp 的管理 HTTP 服务
-    api.c/.h             # REST 路由
-    static.c/.h          # 嵌入式静态资源
+    web.c                # civetweb 管理 HTTP 服务
+    web_api.c            # REST 路由（含 /api/geo/check）
   admin/
-    auth.c/.h            # token/basic auth
+    auth.c               # Basic/代理认证
   db/
-    sqlite.c/.h          # 连接、迁移、事务
+    db.c                 # SQLite 连接、迁移、批量写入
 tests/
   unit/ ...
   integration/ ...
@@ -161,10 +158,19 @@ typedef struct rule {
 
 ## 5. 并发与线程
 
-- 主线程：libevent 循环（accept、IO、定时器）
-- 统计写入线程：从队列取事件，批量事务写入 SQLite
-- DNS：使用 libevent `evdns_base`（异步），避免阻塞
-- 规则热重载：主线程内原子替换指针（RCU 简化版：新规则表构建完成后 swap，旧表延迟释放）
+- **主线程**：libevent 循环（accept、IO、超时、事件泵），**不做任何阻塞调用**。
+- **连接线程池**（`src/net/connpool.c`，默认 32 线程）：执行 DNS 解析、TCP connect、
+  HTTP `CONNECT` / SOCKS5 握手这些阻塞动作；干完把 fd 通过 socketpair 交回主线程。
+  > 为什么必须有它：这些调用原先直接跑在事件循环里，一个慢连接会把所有并发请求串行卡住
+  > （实测 10 个 3s 的坏目标能让无关请求排队 15s）。
+- **统计写入线程**：从队列取会话事件，批量事务写入 SQLite。
+- **超时**：`limits.connect_timeout_sec` 同时用于 connect 和握手（握手期设
+  `SO_RCVTIMEO`，避免"接了 TCP 却不回应答"的上游把工作线程占死）；`limits.idle_timeout_sec`
+  用 bufferevent 超时实现，断掉的会话不会永远停在 ACTIVE。
+- **缓存**：geo 的 LRU 键按语义分前缀（`ip:` / `host:` / `site:` / `lan:`），
+  **不同语义不得共用一个键**（曾因 `geo_site_is_cn` 与 `geo_host_is_cn` 都用 `host:`
+  导致国内 IP 域名被误判走代理）。
+- 规则热重载：主线程内原子替换指针（RCU 简化版：新规则表构建完成后 swap，旧表延迟释放）。
 
 ## 6. 资源与限制
 
@@ -179,3 +185,20 @@ typedef struct rule {
 - 连接失败：向客户端返回 502/504 或 SOCKS5 失败码
 - 上游不可用：按规则 fallback（可配置 `fallback_to_direct`）
 - 统计写入失败：记录日志，不阻塞数据面；队列满时丢弃最旧事件并计数 `dropped_events`
+
+## 8. 请求日志（排障用）
+
+每个请求默认打三行（`log_level: debug` 起才含"连接"行；路由与结束行是 `info`），
+格式由 `src/core/reqlog.c` 的纯函数生成，方便 grep：
+
+```
+[42] 路由 host=www.bing.com:443 proto=HTTP method=CONNECT client=192.168.1.5 \
+     rule=3/cn-ip-direct upstream=direct geo=site:0,ip:1,lan:0
+[42] 连接 upstream=direct ok ms=44
+[42] 结束 host=www.bing.com:443 status=ok dur=0ms up=998 down=8752
+```
+
+- `rule=<id>/<名字>`：命中的规则；`-/default` 表示没规则命中、走了默认上游。
+- `geo=site:x,ip:y,lan:z`：这次实际查到的 geo 结果，`-` 表示**没查**（不是"不是"）。
+- 失败时多一行 `失败 ... reason=<原因> -> <状态码>`，并且结束行会带 `err=`。
+- 想追一个请求：`grep '\[42\]' rybaproxy.log`。

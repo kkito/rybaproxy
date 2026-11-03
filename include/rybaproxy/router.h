@@ -34,7 +34,20 @@ void router_init(router_t *r, const char *default_upstream, bool fallback);
 void router_free(router_t *r);
 int router_add_rule(router_t *r, const rule_t *rule);
 int router_remove_rule(router_t *r, int id);
+/* 命中的规则 + geo 实际查到的结果，供日志展示。
+ * geo_* 三态：1=是、0=不是、-1=这次没查（绝不能假装查过）。 */
+typedef struct {
+    int rule_id;                       /* -1 = 没命中规则 */
+    char rule_name[RYBA_RULE_NAME_MAX];
+    int geo_site;
+    int geo_host;
+    int geo_lan;
+} router_match_t;
+
 int router_select(const router_t *r, const char *host, int port, protocol_t proto, const char *client_ip);
+/* 带诊断信息的选择；out 可为 NULL。绝不为了填 out 而多发查询。 */
+int router_select_ex(const router_t *r, const char *host, int port, protocol_t proto,
+                     const char *client_ip, router_match_t *out);
 /* 返回命中规则的 id（未命中返回 -1）；供 /api/geo/check 展示 */
 int router_select_rule_id(const router_t *r, const char *host, int port, protocol_t proto, const char *client_ip);
 /* helpers exposed for tests */

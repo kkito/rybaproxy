@@ -3,8 +3,11 @@
 
 #include "rybaproxy/auth.h"
 #include "rybaproxy/config.h"
+#include "rybaproxy/connpool.h"
 #include "rybaproxy/http_proxy.h"
+#include "rybaproxy/log.h"
 #include "rybaproxy/relay.h"
+#include "rybaproxy/reqlog.h"
 #include "rybaproxy/router.h"
 #include "rybaproxy/socks5.h"
 #include "rybaproxy/upstream.h"
@@ -20,12 +23,17 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <event2/buffer.h>
 #include <event2/bufferevent.h>
 #include <event2/listener.h>
 #include <event2/util.h>
+
+/* 工作线程数：慢连接最多占满这些线程，再多就排队。
+ * 32 足够覆盖家用并发，同时保证黑洞连接不会耗尽。 */
+#define CONNPOOL_WORKERS 32
 
 typedef struct {
     int headers_done;
@@ -45,6 +53,13 @@ typedef struct {
     int is_http;
     http_conn_t http;
     socks_conn_t socks;
+    /* 异步连接状态：期间事件循环不被阻塞，客户端断开则取消任务 */
+    int connecting;
+    int fallback_tried;
+    upstream_profile_t up; /* 本次尝试的上游副本（配置数组可能被 web 线程改写） */
+    char target_host[256];
+    uint16_t target_port;
+    long conn_start_ms;
 } conn_t;
 
 static void set_nonblock(int fd) {
@@ -52,19 +67,10 @@ static void set_nonblock(int fd) {
     if (fl >= 0) fcntl(fd, F_SETFL, fl | O_NONBLOCK);
 }
 
-static void get_client_ip(struct bufferevent *bev, char *buf, size_t sz) {
-    struct sockaddr_storage ss;
-    socklen_t slen = sizeof ss;
-    int fd = bufferevent_getfd(bev);
-    if (getpeername(fd, (struct sockaddr*)&ss, &slen) == 0) {
-        if (ss.ss_family == AF_INET) {
-            struct sockaddr_in *sin = (struct sockaddr_in*)&ss;
-            inet_ntop(AF_INET, &sin->sin_addr, buf, sz);
-        } else if (ss.ss_family == AF_INET6) {
-            struct sockaddr_in6 *sin6 = (struct sockaddr_in6*)&ss;
-            inet_ntop(AF_INET6, &sin6->sin6_addr, buf, sz);
-        } else snprintf(buf, sz, "unknown");
-    } else snprintf(buf, sz, "unknown");
+static long now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long)ts.tv_sec * 1000L + ts.tv_nsec / 1000000L;
 }
 
 static upstream_profile_t *find_upstream_by_name(server_ctx_t *ctx, const char *name) {
@@ -99,11 +105,13 @@ static upstream_profile_t *direct_upstream(server_ctx_t *srv) {
     return d;
 }
 
-/* 薄胶水：路由选择 + 上游落地。判定全在纯函数 upstream_pick 里，
- * 这里只做「补建 direct」这一件有副作用的事。 */
-static upstream_profile_t *pick_upstream(server_ctx_t *srv, const char *host, uint16_t port,
-                                         protocol_t proto, const char *client_ip) {
-    int route_id = router_select(&srv->router, host, port, proto, client_ip);
+/* 薄胶水：路由选择 + 上游落地 + 打一条决策日志。
+ * 判定全在纯函数 router_select_ex / upstream_pick 里，这里只做副作用。 */
+static upstream_profile_t *pick_upstream_logged(conn_t *c, const char *host, uint16_t port,
+                                                protocol_t proto) {
+    server_ctx_t *srv = c->srv;
+    router_match_t m;
+    int route_id = router_select_ex(&srv->router, host, port, proto, c->session->client_ip, &m);
     int idx = upstream_pick(srv->upstreams, srv->upstream_count,
                             srv->config.default_upstream, route_id);
     if (idx < 0) {
@@ -111,24 +119,117 @@ static upstream_profile_t *pick_upstream(server_ctx_t *srv, const char *host, ui
         idx = upstream_pick(srv->upstreams, srv->upstream_count,
                             srv->config.default_upstream, route_id);
     }
-    return idx < 0 ? NULL : &srv->upstreams[idx];
+    upstream_profile_t *up = idx < 0 ? NULL : &srv->upstreams[idx];
+
+    /* 决策日志：以后翻日志能直接看出「这个域名为什么走了这条线」 */
+    reqlog_route_t r;
+    memset(&r, 0, sizeof r);
+    r.id = c->session->id;
+    r.client = c->session->client_ip;
+    r.host = host;
+    r.port = port;
+    r.proto = (proto == PROTO_SOCKS5) ? "SOCKS5" : "HTTP";
+    r.method = c->session->method[0] ? c->session->method : NULL;
+    r.rule_id = m.rule_id;
+    r.rule_name = m.rule_name;
+    r.upstream = up ? up->name : "(none)";
+    r.geo_site = m.geo_site;
+    r.geo_host = m.geo_host;
+    r.geo_lan = m.geo_lan;
+    char line[512];
+    reqlog_format_route(line, sizeof line, &r);
+    LOG_INFO("%s", line);
+    return up;
 }
 
-static int upstream_connect_profile(upstream_profile_t *up, const char *host, uint16_t port, int *fd) {
-    if (!up) return -1;
-    if (up->type == UPSTREAM_DIRECT) return upstream_connect_direct(host, port, fd);
-    if (up->type == UPSTREAM_HTTP) return upstream_connect_http(up, host, port, fd);
-    if (up->type == UPSTREAM_SOCKS5) return upstream_connect_socks5(up, host, port, fd);
-    return -1;
+/* ---------- 连接上游（异步，跑在 connpool 的线程里） ---------- */
+
+static void http_upstream_ready(conn_t *c, int fd);
+static void socks_upstream_ready(conn_t *c, int fd);
+static void http_respond_error(conn_t *c, int status, const char *reason);
+static void socks_respond_failure(conn_t *c);
+
+static void on_upstream_ready(void *ctx, int fd, int upstream_id, void *ud);
+
+static void begin_connect(conn_t *c, upstream_profile_t *up) {
+    c->up = *up;
+    c->session->upstream_id = up->id;
+    c->connecting = 1;
+    c->conn_start_ms = now_ms();
+    if (connpool_submit(c, &c->up, c->target_host, c->target_port,
+                        on_upstream_ready, c) != 0) {
+        c->connecting = 0;
+        if (c->is_http) http_respond_error(c, 502, "pool_unavailable");
+        else socks_respond_failure(c);
+        return;
+    }
 }
 
-/* ---------- HTTP handling ---------- */
+static void on_upstream_ready(void *ctx, int fd, int upstream_id, void *ud) {
+    (void)ud;
+    conn_t *c = ctx;
+    server_ctx_t *srv = c->srv;
+    c->connecting = 0;
+    long ms = now_ms() - c->conn_start_ms;
+
+    char line[256];
+    reqlog_format_connect(line, sizeof line, c->session->id, c->up.name, fd >= 0, ms,
+                          fd >= 0 ? NULL : (ms >= srv->config.connect_timeout_sec * 1000L
+                                            ? "timeout" : "connect_failed"));
+    LOG_DEBUG("%s", line);
+
+    if (fd < 0) {
+        if (srv->config.fallback_to_direct && c->up.type != UPSTREAM_DIRECT && !c->fallback_tried) {
+            upstream_profile_t *fb = direct_upstream(srv);
+            if (fb) {
+                c->fallback_tried = 1;
+                LOG_WARN("[%llu] 上游 %s 连接失败，回落 direct 重试",
+                         (unsigned long long)c->session->id, c->up.name);
+                begin_connect(c, fb);
+                return;
+            }
+        }
+        if (c->is_http) http_respond_error(c, 502, "connect_failed");
+        else socks_respond_failure(c);
+        return;
+    }
+    if (upstream_id != c->up.id) c->session->upstream_id = upstream_id;
+    set_nonblock(fd);
+    if (c->is_http) http_upstream_ready(c, fd);
+    else socks_upstream_ready(c, fd);
+}
+
+/* 客户端在上游连接期间就断了：取消任务（池子会关掉已连上的 fd） */
+static void cancel_pending_connect(conn_t *c) {
+    if (c->connecting) {
+        connpool_cancel(c);
+        c->connecting = 0;
+    }
+}
+
+/* ---------- 会话收尾 ---------- */
+
+static void log_session_result(session_t *s) {
+    if (!s) return;
+    const char *err = NULL;
+    if (s->status == SESS_TIMEOUT) err = "timeout";
+    else if (s->status == SESS_ERROR) err = s->error_msg[0] ? s->error_msg : "error";
+    long dur = 0;
+    if (s->ended_at > 0 && s->started_at > 0)
+        dur = (long)(s->ended_at - s->started_at) * 1000L;
+    char line[512];
+    reqlog_format_finish(line, sizeof line, s->id, s->target_host, s->target_port,
+                         s->error_code, dur, s->bytes_up, s->bytes_down, err);
+    LOG_INFO("%s", line);
+}
 
 static void http_finish(conn_t *c, int status) {
+    cancel_pending_connect(c);
     /* status 是本次响应码：错误路径（400/407/431/502）走到这里时会话还 ACTIVE，
      * 必须先结算再落库，否则 DB 里就是永远"活跃"、error_code=0 的幽灵会话。 */
     if (c->session) session_settle_http(c->session, status);
     if (c->session) {
+        log_session_result(c->session);
         if (c->session->bev_client) bufferevent_setcb(c->session->bev_client, NULL, NULL, NULL, NULL);
         if (c->session->bev_upstream) bufferevent_setcb(c->session->bev_upstream, NULL, NULL, NULL, NULL);
         c->session->user_data = NULL;
@@ -149,128 +250,155 @@ static void http_finish(conn_t *c, int status) {
     free(c);
 }
 
+/* 错误响应统一出口：写响应 + 落日志 + 结算（原来 5 处重复） */
+static void http_respond_error(conn_t *c, int status, const char *reason) {
+    static const struct { int code; const char *resp; } kResponses[] = {
+        { 400, "HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n" },
+        { 407, "HTTP/1.1 407 Proxy Authentication Required\r\n"
+               "Proxy-Authenticate: Basic realm=\"rybaproxy\"\r\nConnection: close\r\n\r\n" },
+        { 431, "HTTP/1.1 431 Request Header Fields Too Large\r\nConnection: close\r\n\r\n" },
+        { 502, "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n" },
+    };
+    if (c->session)
+        LOG_WARN("[%llu] 失败 host=%s:%u upstream=%s reason=%s -> %d",
+                 (unsigned long long)c->session->id, c->session->target_host,
+                 (unsigned)c->session->target_port, c->up.name[0] ? c->up.name : "-",
+                 reason ? reason : "-", status);
+    const char *resp = NULL;
+    for (size_t i = 0; i < sizeof kResponses / sizeof kResponses[0]; i++)
+        if (kResponses[i].code == status) resp = kResponses[i].resp;
+    if (!resp) resp = "HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n";
+    if (c->session && c->session->bev_client) {
+        int fd = bufferevent_getfd(c->session->bev_client);
+        if (fd >= 0) {
+            ssize_t n = write(fd, resp, strlen(resp));
+            (void)n;
+        }
+    }
+    http_finish(c, status);
+}
+
+/* 空闲超时：以前没有，断掉的会话会永远停在 ACTIVE（DB 里的幽灵会话） */
+static void apply_idle_timeout(conn_t *c, struct bufferevent *bev) {
+    int sec = c->srv->config.idle_timeout_sec;
+    if (sec <= 0) return;
+    struct timeval tv = { sec, 0 };
+    bufferevent_set_timeouts(bev, &tv, &tv);
+}
+
+/* ---------- HTTP handling ---------- */
+
+/* 把客户端的请求行改成 origin-form 后再发给上游 */
+static void send_rewritten_request(conn_t *c, struct bufferevent *bev_up) {
+    char path[2048];
+    snprintf(path, sizeof path, "/");
+    const char *u = c->http.info.url;
+    if (strncmp(u, "http://", 7) == 0 || strncmp(u, "https://", 8) == 0) {
+        int ssl = (strncmp(u, "https://", 8) == 0);
+        const char *p = u + (ssl ? 8 : 7);
+        const char *slash = strchr(p, '/');
+        if (slash) snprintf(path, sizeof path, "%s", slash);
+        else snprintf(path, sizeof path, "/");
+    }
+    char *rest = strstr(c->http.reqbuf, "\r\n");
+    if (rest) rest += 2;
+    char outbuf[16384];
+    int on = snprintf(outbuf, sizeof outbuf, "%s %s HTTP/1.1\r\n%s",
+                      c->http.info.method, path, rest ? rest : "");
+    if (on > 0) bufferevent_write(bev_up, outbuf, (size_t)on);
+}
+
+static void http_upstream_ready(conn_t *c, int fd) {
+    server_ctx_t *srv = c->srv;
+    struct bufferevent *bev = c->session->bev_client;
+    struct bufferevent *bev_up = bufferevent_socket_new(srv->base, fd, BEV_OPT_CLOSE_ON_FREE);
+    if (!bev_up) {
+        close(fd);
+        http_respond_error(c, 502, "bufferevent_failed");
+        return;
+    }
+    c->session->bev_upstream = bev_up;
+    apply_idle_timeout(c, bev_up);
+    apply_idle_timeout(c, bev);
+
+    struct evbuffer *in2 = bufferevent_get_input(bev);
+    struct evbuffer *up_out = bufferevent_get_output(bev_up);
+    evbuffer_drain(in2, c->http.req_len);
+    if (!c->http.is_connect) {
+        send_rewritten_request(c, bev_up);
+        evbuffer_add_buffer(up_out, in2);
+    } else {
+        evbuffer_add_buffer(up_out, in2);
+        static const char kEstablished[] = "HTTP/1.1 200 Connection Established\r\n\r\n";
+        int cfd = bufferevent_getfd(bev);
+        if (cfd >= 0) {
+            ssize_t n = write(cfd, kEstablished, sizeof kEstablished - 1);
+            (void)n;
+        }
+    }
+    relay_start(c->session, bev, bev_up);
+}
+
 static void http_read_cb(struct bufferevent *bev, void *arg) {
     conn_t *c = arg;
     server_ctx_t *srv = c->srv;
     session_t *s = c->session;
 
-    if (!c->http.headers_done) {
-        struct evbuffer *in = bufferevent_get_input(bev);
-        struct evbuffer_ptr ptr = evbuffer_search(in, "\r\n\r\n", 4, NULL);
-        if (ptr.pos < 0) {
-            if (evbuffer_get_length(in) > 16384) {
-                { const char *r="HTTP/1.1 431 Request Header Fields Too Large\r\nConnection: close\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
-                http_finish(c, 431);
-            }
-            return;
-        }
-        size_t header_len = (size_t)ptr.pos + 4;
-        if (header_len > sizeof c->http.reqbuf - 1) header_len = sizeof c->http.reqbuf - 1;
-        evbuffer_copyout(in, c->http.reqbuf, header_len);
-        c->http.reqbuf[header_len] = '\0';
-        c->http.req_len = header_len;
-        c->http.headers_done = 1;
+    if (c->http.headers_done) return;
 
-        http_request_info_t info;
-        if (http_proxy_parse_request(c->http.reqbuf, header_len, &info) != 0) {
-            { const char *r="HTTP/1.1 400 Bad Request\r\nConnection: close\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
-            http_finish(c, 400);
-            return;
-        }
-        session_set_target(s, info.host, info.port);
-        session_set_method(s, info.method);
-        c->http.is_connect = info.is_connect;
-        c->http.info = info;
-
-        /* auth */
-        if (srv->config.proxy_auth_enabled) {
-            /* need Proxy-Authorization header; parse from reqbuf */
-            const char *h = str_case_find(c->http.reqbuf, "Proxy-Authorization:");
-            char val[256] = {0};
-            if (h) {
-                h += strlen("Proxy-Authorization:");
-                while (*h == ' ') h++;
-                size_t i = 0;
-                while (h[i] && h[i] != '\r' && h[i] != '\n' && i < sizeof val - 1) { val[i] = h[i]; i++; }
-                val[i] = '\0';
-            }
-            if (!auth_basic_check(val, srv->config.proxy_username, srv->config.proxy_password)) {
-                const char *resp = "HTTP/1.1 407 Proxy Authentication Required\r\nProxy-Authenticate: Basic realm=\"rybaproxy\"\r\nConnection: close\r\n\r\n";
-                int fd = bufferevent_getfd(bev);
-                if (fd >= 0) { ssize_t _ = write(fd, resp, strlen(resp)); (void)_; }
-                http_finish(c, 407);
-                return;
-            }
-        }
-
-        /* routing */
-        upstream_profile_t *up = pick_upstream(srv, info.host, info.port, PROTO_HTTP, s->client_ip);
-        if (!up) {
-            { const char *r="HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
-            http_finish(c, 502);
-            return;
-        }
-        /* 先记下决定走的上游：连接失败时统计的也是真实尝试过的线路，
-         * 而不是 upstream_id 初值 0（会被 find_upstream_by_id(0) 错记成第一个上游） */
-        s->upstream_id = up->id;
-
-        /* connect */
-        int fd = -1;
-        if (upstream_connect_profile(up, info.host, info.port, &fd) != 0) {
-            if (srv->config.fallback_to_direct && up->type != UPSTREAM_DIRECT) {
-                upstream_profile_t *fb = direct_upstream(srv);
-                if (fb && upstream_connect_profile(fb, info.host, info.port, &fd) == 0) {
-                    up = fb;
-                    s->upstream_id = fb->id;
-                }
-            }
-        }
-        if (fd < 0) {
-            { const char *r="HTTP/1.1 502 Bad Gateway\r\nConnection: close\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
-            http_finish(c, 502);
-            return;
-        }
-        set_nonblock(fd);
-        struct bufferevent *bev_up = bufferevent_socket_new(srv->base, fd, BEV_OPT_CLOSE_ON_FREE);
-        s->bev_upstream = bev_up;
-
-        struct evbuffer *in2 = bufferevent_get_input(bev);
-        struct evbuffer *up_out = bufferevent_get_output(bev_up);
-        if (!c->http.is_connect) {
-            evbuffer_drain(in2, header_len);
-            {
-                /* rewrite absolute URI to origin form (tunnel mode) */
-                char path[2048];
-                snprintf(path, sizeof path, "/");
-                const char *u = c->http.info.url;
-                if (strncmp(u, "http://", 7) == 0 || strncmp(u, "https://", 8) == 0) {
-                    int ssl = (strncmp(u, "https://", 8) == 0);
-                    const char *p = u + (ssl ? 8 : 7);
-                    const char *slash = strchr(p, '/');
-                    if (slash) snprintf(path, sizeof path, "%s", slash);
-                    else snprintf(path, sizeof path, "/");
-                }
-                char *rest = strstr(c->http.reqbuf, "\r\n");
-                if (rest) rest += 2;
-                char outbuf[16384];
-                int on = snprintf(outbuf, sizeof outbuf, "%s %s HTTP/1.1\r\n%s",
-                                  c->http.info.method, path, rest ? rest : "");
-                bufferevent_write(bev_up, outbuf, on);
-            }
-            evbuffer_add_buffer(up_out, in2);
-        } else {
-            evbuffer_drain(in2, header_len);
-            evbuffer_add_buffer(up_out, in2);
-            { const char *r="HTTP/1.1 200 Connection Established\r\n\r\n"; int fd=bufferevent_getfd(bev); if(fd>=0){ssize_t _=write(fd,r,strlen(r));(void)_;} }
-        }
-
-        relay_start(s, bev, bev_up);
-    } else {
-        /* headers already processed; relay handles future data */
+    struct evbuffer *in = bufferevent_get_input(bev);
+    struct evbuffer_ptr ptr = evbuffer_search(in, "\r\n\r\n", 4, NULL);
+    if (ptr.pos < 0) {
+        if (evbuffer_get_length(in) > 16384) http_respond_error(c, 431, "header_too_large");
+        return;
     }
+    size_t header_len = (size_t)ptr.pos + 4;
+    if (header_len > sizeof c->http.reqbuf - 1) header_len = sizeof c->http.reqbuf - 1;
+    evbuffer_copyout(in, c->http.reqbuf, header_len);
+    c->http.reqbuf[header_len] = '\0';
+    c->http.req_len = header_len;
+    c->http.headers_done = 1;
+
+    http_request_info_t info;
+    if (http_proxy_parse_request(c->http.reqbuf, header_len, &info) != 0) {
+        http_respond_error(c, 400, "bad_request");
+        return;
+    }
+    session_set_target(s, info.host, info.port);
+    session_set_method(s, info.method);
+    c->http.is_connect = info.is_connect;
+    c->http.info = info;
+
+    if (srv->config.proxy_auth_enabled) {
+        const char *h = str_case_find(c->http.reqbuf, "Proxy-Authorization:");
+        char val[256] = {0};
+        if (h) {
+            h += strlen("Proxy-Authorization:");
+            while (*h == ' ') h++;
+            size_t i = 0;
+            while (h[i] && h[i] != '\r' && h[i] != '\n' && i < sizeof val - 1) { val[i] = h[i]; i++; }
+            val[i] = '\0';
+        }
+        if (!auth_basic_check(val, srv->config.proxy_username, srv->config.proxy_password)) {
+            http_respond_error(c, 407, "proxy_auth_required");
+            return;
+        }
+    }
+
+    upstream_profile_t *up = pick_upstream_logged(c, info.host, info.port, PROTO_HTTP);
+    if (!up) {
+        http_respond_error(c, 502, "no_upstream");
+        return;
+    }
+    snprintf(c->target_host, sizeof c->target_host, "%s", info.host);
+    c->target_port = info.port;
+    /* 连上游期间不读客户端：数据留在内核缓冲，形成天然背压 */
+    bufferevent_disable(bev, EV_READ);
+    begin_connect(c, up);
 }
 
 static void http_event_cb(struct bufferevent *bev, short events, void *arg) {
+    (void)bev;
     conn_t *c = arg;
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR | BEV_EVENT_TIMEOUT)) {
         session_finish(c->session, (events & BEV_EVENT_TIMEOUT) ? SESS_TIMEOUT : SESS_DONE, 0, NULL);
@@ -284,6 +412,40 @@ static void socks_send(struct bufferevent *bev, const void *d, size_t n) {
     bufferevent_write(bev, d, n);
 }
 
+static void socks_respond_failure(conn_t *c) {
+    unsigned char r[10];
+    socks5_build_reply(r, SOCKS5_REP_FAILURE);
+    if (c->session && c->session->bev_client) socks_send(c->session->bev_client, r, 10);
+    if (c->session)
+        LOG_WARN("[%llu] 失败 host=%s:%u upstream=%s reason=socks5_upstream_failed",
+                 (unsigned long long)c->session->id, c->session->target_host,
+                 (unsigned)c->session->target_port, c->up.name[0] ? c->up.name : "-");
+    http_finish(c, 0);
+}
+
+static void socks_upstream_ready(conn_t *c, int fd) {
+    server_ctx_t *srv = c->srv;
+    struct bufferevent *bev = c->session->bev_client;
+    struct bufferevent *bev_up = bufferevent_socket_new(srv->base, fd, BEV_OPT_CLOSE_ON_FREE);
+    if (!bev_up) {
+        close(fd);
+        socks_respond_failure(c);
+        return;
+    }
+    c->session->bev_upstream = bev_up;
+    apply_idle_timeout(c, bev_up);
+    apply_idle_timeout(c, bev);
+
+    unsigned char r[10];
+    socks5_build_reply(r, SOCKS5_REP_SUCCESS);
+    socks_send(bev, r, 10);
+
+    struct evbuffer *in2 = bufferevent_get_input(bev);
+    struct evbuffer *up_out = bufferevent_get_output(bev_up);
+    evbuffer_add_buffer(up_out, in2);
+    relay_start(c->session, bev, bev_up);
+}
+
 static void socks_read_cb(struct bufferevent *bev, void *arg) {
     conn_t *c = arg;
     server_ctx_t *srv = c->srv;
@@ -293,6 +455,7 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
     if (len == 0) return;
 
     unsigned char *data = malloc(len);
+    if (!data) return;
     evbuffer_copyout(in, data, len);
 
     if (c->socks.state == 0) {
@@ -300,7 +463,6 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
         if (len < 2) { free(data); return; }
         int nmethods = data[1];
         if (len < (size_t)(2 + nmethods)) { free(data); return; }
-        /* choose method */
         int offer_noauth = 0, offer_auth = 0;
         for (int i = 0; i < nmethods; i++) {
             if (data[2+i] == 0x00) offer_noauth = 1;
@@ -316,16 +478,14 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
         }
         unsigned char resp[2] = {0x05, method};
         socks_send(bev, resp, 2);
-        evbuffer_drain(in, 2 + nmethods);
+        evbuffer_drain(in, 2 + (size_t)nmethods);
         if (method == 0xFF) {
             free(data);
-            http_finish((conn_t*)c, 0); /* reuse finish */
-            /* but c is conn_t*; okay */
+            http_finish(c, 0);
             return;
         }
         c->socks.state = (method == 0x02) ? 1 : 2;
         free(data);
-        /* reprocess */
         socks_read_cb(bev, arg);
         return;
     }
@@ -339,17 +499,17 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
         if (len < (size_t)(2 + ulen + 1 + plen)) { free(data); return; }
         char user[128] = {0}, pass[128] = {0};
         if (ulen < 127 && plen < 127) {
-            memcpy(user, data + 2, ulen);
-            memcpy(pass, data + 3 + ulen, plen);
+            memcpy(user, data + 2, (size_t)ulen);
+            memcpy(pass, data + 3 + ulen, (size_t)plen);
         }
         int ok = (strcmp(user, srv->config.proxy_username) == 0 &&
                   strcmp(pass, srv->config.proxy_password) == 0);
         unsigned char resp[2] = {0x01, ok ? 0x00 : 0x01};
         socks_send(bev, resp, 2);
-        evbuffer_drain(in, 2 + ulen + 1 + plen);
+        evbuffer_drain(in, (size_t)(2 + ulen + 1 + plen));
         if (!ok) {
             free(data);
-            http_finish((conn_t*)c, 0);
+            http_finish(c, 0);
             return;
         }
         c->socks.state = 2;
@@ -359,18 +519,16 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
     }
 
     if (c->socks.state == 2) {
-        /* request */
         char host[256] = {0};
         uint16_t port = 0;
-        int consumed = socks5_parse_request(data, len, host, sizeof host, &port);
+        int consumed = socks5_parse_request((const char*)data, len, host, sizeof host, &port);
         if (consumed == -1) { free(data); return; } /* incomplete */
         if (consumed < 0) {
-            /* unsupported */
             unsigned char r[10];
             socks5_build_reply(r, SOCKS5_REP_CMD_NOT_SUPPORTED);
             socks_send(bev, r, 10);
             free(data);
-            http_finish((conn_t*)c, 0);
+            http_finish(c, 0);
             return;
         }
         evbuffer_drain(in, (size_t)consumed);
@@ -378,46 +536,17 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
         session_set_target(s, host, port);
         snprintf(s->method, sizeof s->method, "SOCKS5-CONNECT");
 
-        upstream_profile_t *up = pick_upstream(srv, host, port, PROTO_SOCKS5, s->client_ip);
+        upstream_profile_t *up = pick_upstream_logged(c, host, port, PROTO_SOCKS5);
         if (!up) {
-            unsigned char r[10];
-            socks5_build_reply(r, SOCKS5_REP_FAILURE);
-            socks_send(bev, r, 10);
             free(data);
-            http_finish((conn_t*)c, 0);
+            socks_respond_failure(c);
             return;
         }
-        /* 同 HTTP 路径：先记，失败时统计不错报 */
-        s->upstream_id = up->id;
-
-        int fd = -1;
-        if (upstream_connect_profile(up, host, port, &fd) != 0) {
-            if (srv->config.fallback_to_direct && up->type != UPSTREAM_DIRECT) {
-                upstream_profile_t *fb = direct_upstream(srv);
-                if (fb && upstream_connect_profile(fb, host, port, &fd) == 0) {
-                    up = fb;
-                    s->upstream_id = fb->id;
-                }
-            }
-        }
-        if (fd < 0) {
-            unsigned char r[10];
-            socks5_build_reply(r, SOCKS5_REP_FAILURE);
-            socks_send(bev, r, 10);
-            free(data);
-            http_finish((conn_t*)c, 0);
-            return;
-        }
-        set_nonblock(fd);
-        struct bufferevent *bev_up = bufferevent_socket_new(srv->base, fd, BEV_OPT_CLOSE_ON_FREE);
-        s->bev_upstream = bev_up;
-
-        unsigned char r[10];
-        socks5_build_reply(r, SOCKS5_REP_SUCCESS);
-        socks_send(bev, r, 10);
-
-        relay_start(s, bev, bev_up);
+        snprintf(c->target_host, sizeof c->target_host, "%s", host);
+        c->target_port = port;
+        bufferevent_disable(bev, EV_READ);
         free(data);
+        begin_connect(c, up);
         return;
     }
 
@@ -425,6 +554,7 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
 }
 
 static void socks_event_cb(struct bufferevent *bev, short events, void *arg) {
+    (void)bev;
     conn_t *c = arg;
     if (events & (BEV_EVENT_EOF | BEV_EVENT_ERROR | BEV_EVENT_TIMEOUT)) {
         session_finish(c->session, (events & BEV_EVENT_TIMEOUT) ? SESS_TIMEOUT : SESS_DONE, 0, NULL);
@@ -434,61 +564,53 @@ static void socks_event_cb(struct bufferevent *bev, short events, void *arg) {
 
 /* ---------- accept ---------- */
 
-static void accept_cb(struct evconnlistener *lev, evutil_socket_t fd, struct sockaddr *addr, int socklen, void *arg) {
-    (void)lev; (void)addr; (void)socklen;
-    server_ctx_t *srv = arg;
-    set_nonblock(fd);
-    char ip[64]; ip[0] = '\0';
+static void fill_client_ip(struct sockaddr *addr, char *ip, size_t sz) {
+    ip[0] = '\0';
+    if (!addr) { snprintf(ip, sz, "unknown"); return; }
     if (addr->sa_family == AF_INET) {
         struct sockaddr_in *sin = (struct sockaddr_in*)addr;
-        inet_ntop(AF_INET, &sin->sin_addr, ip, sizeof ip);
-    } else snprintf(ip, sizeof ip, "unknown");
-
-    int is_http = (fd == -1) ? 1 : 1; /* determine by listener? We'll pass via arg? */
-    /* We need know which port. Use fd? Instead, store in srv? We'll create two listeners with different callbacks. */
-    (void)is_http;
-    (void)srv;
-    (void)ip;
-    (void)fd;
+        inet_ntop(AF_INET, &sin->sin_addr, ip, sz);
+    } else if (addr->sa_family == AF_INET6) {
+        struct sockaddr_in6 *sin6 = (struct sockaddr_in6*)addr;
+        inet_ntop(AF_INET6, &sin6->sin6_addr, ip, sz);
+    } else snprintf(ip, sz, "unknown");
 }
 
-/* We'll instead create accept handlers per protocol. */
-
-static void http_accept_cb(struct evconnlistener *lev, evutil_socket_t fd, struct sockaddr *addr, int socklen, void *arg) {
+static void http_accept_cb(struct evconnlistener *lev, evutil_socket_t fd, struct sockaddr *addr,
+                           int socklen, void *arg) {
     (void)lev; (void)socklen;
     server_ctx_t *srv = arg;
     set_nonblock(fd);
-    char ip[64] = "unknown";
-    if (addr->sa_family == AF_INET) {
-        struct sockaddr_in *sin = (struct sockaddr_in*)addr;
-        inet_ntop(AF_INET, &sin->sin_addr, ip, sizeof ip);
-    }
+    char ip[64];
+    fill_client_ip(addr, ip, sizeof ip);
     session_t *s = session_create(srv->base, PROTO_HTTP, ip);
     conn_t *c = calloc(1, sizeof *c);
+    if (!s || !c) { if (s) session_destroy(s); free(c); close(fd); return; }
     c->srv = srv; c->session = s; c->is_http = 1;
     s->user_data = c;
 
     struct bufferevent *bev = bufferevent_socket_new(srv->base, fd, BEV_OPT_CLOSE_ON_FREE);
+    if (!bev) { session_destroy(s); free(c); close(fd); return; }
     bufferevent_setcb(bev, http_read_cb, NULL, http_event_cb, c);
     bufferevent_enable(bev, EV_READ | EV_WRITE);
     s->bev_client = bev;
 }
 
-static void socks_accept_cb(struct evconnlistener *lev, evutil_socket_t fd, struct sockaddr *addr, int socklen, void *arg) {
+static void socks_accept_cb(struct evconnlistener *lev, evutil_socket_t fd, struct sockaddr *addr,
+                            int socklen, void *arg) {
     (void)lev; (void)socklen;
     server_ctx_t *srv = arg;
     set_nonblock(fd);
-    char ip[64] = "unknown";
-    if (addr->sa_family == AF_INET) {
-        struct sockaddr_in *sin = (struct sockaddr_in*)addr;
-        inet_ntop(AF_INET, &sin->sin_addr, ip, sizeof ip);
-    }
+    char ip[64];
+    fill_client_ip(addr, ip, sizeof ip);
     session_t *s = session_create(srv->base, PROTO_SOCKS5, ip);
     conn_t *c = calloc(1, sizeof *c);
+    if (!s || !c) { if (s) session_destroy(s); free(c); close(fd); return; }
     c->srv = srv; c->session = s; c->is_http = 0;
     s->user_data = c;
 
     struct bufferevent *bev = bufferevent_socket_new(srv->base, fd, BEV_OPT_CLOSE_ON_FREE);
+    if (!bev) { session_destroy(s); free(c); close(fd); return; }
     bufferevent_setcb(bev, socks_read_cb, NULL, socks_event_cb, c);
     bufferevent_enable(bev, EV_READ | EV_WRITE);
     s->bev_client = bev;
@@ -519,7 +641,9 @@ int server_init(server_ctx_t *ctx, const config_t *cfg) {
     ctx->base = event_base_new();
     if (!ctx->base) return -1;
 
-    /* listeners */
+    /* 阻塞式上游连接交给线程池；事件循环只收结果 */
+    if (connpool_init(ctx->base, CONNPOOL_WORKERS) != 0) return -1;
+
     struct sockaddr_in sin;
     memset(&sin, 0, sizeof sin);
     sin.sin_family = AF_INET;
@@ -549,10 +673,10 @@ int server_run(server_ctx_t *ctx) {
 }
 
 void server_free(server_ctx_t *ctx) {
+    connpool_shutdown();
     pthread_mutex_destroy(&ctx->lock);
     if (ctx->base) event_base_free(ctx->base);
     router_free(&ctx->router);
-    /* do not free upstreams if owned by config? free anyway */
     free(ctx->upstreams);
     ctx->upstreams = NULL;
     ctx->upstream_count = 0;

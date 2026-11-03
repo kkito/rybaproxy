@@ -4,6 +4,12 @@
 #include "rybaproxy/common.h"
 #include <event2/event.h>
 
+/* 统一入口：按 up->type 分发到 direct / HTTP CONNECT / SOCKS5 */
+int upstream_connect_profile(const upstream_profile_t *up, const char *host, uint16_t port, int *out_fd);
+/* 连接与握手超时（秒），默认 10；握手期间同时设 SO_RCVTIMEO/SO_SNDTIMEO，
+ * 免得回了 TCP 却不回应答的上游把工作线程永久占死。*/
+void upstream_set_connect_timeout(int sec);
+
 int upstream_connect_direct(const char *host, uint16_t port, int *out_fd);
 int upstream_connect_http(const upstream_profile_t *up, const char *target_host, uint16_t target_port, int *out_fd);
 int upstream_connect_socks5(const upstream_profile_t *up, const char *target_host, uint16_t target_port, int *out_fd);

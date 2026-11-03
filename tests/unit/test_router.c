@@ -277,6 +277,47 @@ static void test_rule_geo_and_domain(void **s) {
     router_free(&r);
 }
 
+/* router_select_ex：除了路由结果，还要把「命中哪条规则」和「geo 实际查到什么」
+ * 一起带出来给日志用。关键约束：不许为了记日志额外发 DNS 查询。 */
+static void test_select_ex_records_rule_and_geo(void **s) {
+    (void)s;
+    geo_set_resolver(must_not_resolve_netcheck); /* 用了 DNS 就算失败 */
+    router_t r; router_init(&r, "direct", 1);
+    rule_t rule = {0}; rule.id=3; rule.priority=240; rule.enabled=1;
+    strcpy(rule.name, "cn-ip"); strcpy(rule.geo_ip, "cn"); rule.upstream_id=0;
+    router_add_rule(&r, &rule);
+
+    router_match_t m;
+    memset(&m, 0x7f, sizeof m);
+    assert_int_equal(router_select_ex(&r, "1.2.3.9", 443, PROTO_HTTP, "10.0.0.1", &m), 0);
+    assert_int_equal(m.rule_id, 3);
+    assert_string_equal(m.rule_name, "cn-ip");
+    assert_int_equal(m.geo_host, 1);   /* 查了，且是 CN */
+    assert_int_equal(m.geo_site, -1);  /* 没查过就是 -1，不能瞎写 0 */
+    assert_int_equal(m.geo_lan, -1);
+
+    assert_int_equal(router_select_ex(&r, "9.9.9.9", 443, PROTO_HTTP, "10.0.0.1", &m), -1);
+    assert_int_equal(m.rule_id, -1);
+    assert_string_equal(m.rule_name, "");
+    assert_int_equal(m.geo_host, 0);   /* 查了，非 CN */
+
+    /* geo_site 只用查表：换一个不含 geo_ip 条件的路由，哨兵才能证明零 DNS */
+    router_t r2;
+    router_init(&r2, "direct", 1);
+    rule_t site_rule = {0};
+    site_rule.id = 4; site_rule.priority = 250; site_rule.enabled = 1;
+    strcpy(site_rule.name, "cn-site"); strcpy(site_rule.geo_site, "cn"); site_rule.upstream_id = 0;
+    router_add_rule(&r2, &site_rule);
+    assert_int_equal(router_select_ex(&r2, "a.example.cn", 443, PROTO_HTTP, "10.0.0.1", &m), 0);
+    assert_int_equal(m.rule_id, 4);
+    assert_int_equal(m.geo_site, 1);
+    assert_int_equal(m.geo_host, -1); /* 这条路由没查 IP，日志里必须是 - */
+
+    geo_set_resolver(NULL);
+    router_free(&r2);
+    router_free(&r);
+}
+
 int main(void) {
     const struct CMUnitTest tests[] = {
         cmocka_unit_test(test_domain_wildcard),
@@ -292,6 +333,7 @@ int main(void) {
         cmocka_unit_test_setup_teardown(test_rule_geo_lan_beats_cn, geo_setup, geo_teardown),
         cmocka_unit_test(test_rule_geo_empty_db_no_match),
         cmocka_unit_test_setup_teardown(test_rule_geo_and_domain, geo_setup, geo_teardown),
+        cmocka_unit_test_setup_teardown(test_select_ex_records_rule_and_geo, geo_setup, geo_teardown),
     };
     return cmocka_run_group_tests(tests, NULL, NULL);
 }

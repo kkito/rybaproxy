@@ -9,6 +9,7 @@
 #include "rybaproxy/server.h"
 #include "rybaproxy/startup_info.h"
 #include "rybaproxy/stats.h"
+#include "rybaproxy/upstream.h"
 #include "rybaproxy/web.h"
 #include "rybaproxy/version.h"
 

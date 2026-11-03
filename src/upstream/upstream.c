@@ -14,6 +14,12 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+static int g_connect_timeout_sec = 10;
+
+void upstream_set_connect_timeout(int sec) {
+    if (sec > 0) g_connect_timeout_sec = sec;
+}
+
 static int connect_timeout_fd(int fd, const struct sockaddr *sa, socklen_t slen, int sec) {
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
@@ -39,6 +45,25 @@ static int connect_timeout_fd(int fd, const struct sockaddr *sa, socklen_t slen,
     return 0;
 }
 
+/* 握手期间给阻塞 socket 加超时；成功后清零，免得残留在 relay 用的 fd 上。 */
+static int set_io_timeout(int fd, int sec) {
+    struct timeval tv = { .tv_sec = sec, .tv_usec = 0 };
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv) != 0) return -1;
+    if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof tv) != 0) return -1;
+    return 0;
+}
+
+/* 阻塞读满 n 字节（握手应答可能分片到达，单次 recv 不够） */
+static int read_full(int fd, void *buf, size_t n) {
+    size_t got = 0;
+    while (got < n) {
+        ssize_t r = recv(fd, (char *)buf + got, n - got, 0);
+        if (r <= 0) return -1;
+        got += (size_t)r;
+    }
+    return 0;
+}
+
 static int tcp_connect_host(const char *host, uint16_t port, int sec) {
     struct addrinfo hints, *res = NULL;
     memset(&hints, 0, sizeof hints);
@@ -58,8 +83,16 @@ static int tcp_connect_host(const char *host, uint16_t port, int sec) {
     return fd;
 }
 
+int upstream_connect_profile(const upstream_profile_t *up, const char *host, uint16_t port, int *out_fd) {
+    if (!up || !host || !host[0] || !out_fd) return -1;
+    if (up->type == UPSTREAM_DIRECT) return upstream_connect_direct(host, port, out_fd);
+    if (up->type == UPSTREAM_HTTP) return upstream_connect_http(up, host, port, out_fd);
+    if (up->type == UPSTREAM_SOCKS5) return upstream_connect_socks5(up, host, port, out_fd);
+    return -1;
+}
+
 int upstream_connect_direct(const char *host, uint16_t port, int *out_fd) {
-    int fd = tcp_connect_host(host, port, 10);
+    int fd = tcp_connect_host(host, port, g_connect_timeout_sec);
     if (fd < 0) return -1;
     *out_fd = fd;
     return 0;
@@ -80,8 +113,10 @@ static int read_http_response(int fd, char *buf, size_t cap) {
 
 int upstream_connect_http(const upstream_profile_t *up, const char *target_host, uint16_t target_port, int *out_fd) {
     if (!up) return -1;
-    int fd = tcp_connect_host(up->host, up->port, 10);
+    int fd = tcp_connect_host(up->host, up->port, g_connect_timeout_sec);
     if (fd < 0) return -1;
+    /* 上游可能接了 TCP 却永远不回 CONNECT 应答：没有这个超时，握手会永久挂住 */
+    set_io_timeout(fd, g_connect_timeout_sec);
     char req[1024];
     char target[320];
     /* IPv6 目标必须带方括号，否则 CONNECT 2401:67c::1:443 是坏请求 */
@@ -117,21 +152,23 @@ int upstream_connect_http(const upstream_profile_t *up, const char *target_host,
     char resp[4096];
     if (read_http_response(fd, resp, sizeof resp) != 0) { close(fd); return -1; }
     if (strstr(resp, "200") == NULL) { close(fd); return -1; }
+    set_io_timeout(fd, 0);
     *out_fd = fd;
     return 0;
 }
 
 int upstream_connect_socks5(const upstream_profile_t *up, const char *target_host, uint16_t target_port, int *out_fd) {
     if (!up) return -1;
-    int fd = tcp_connect_host(up->host, up->port, 10);
+    int fd = tcp_connect_host(up->host, up->port, g_connect_timeout_sec);
     if (fd < 0) return -1;
+    set_io_timeout(fd, g_connect_timeout_sec);
     /* handshake: no auth or username/password */
     unsigned char buf[4];
     if (up->username[0]) {
         unsigned char hello[4] = {0x05,0x02,0x00,0x02};
         if (send(fd, hello, 4, 0) != 4) { close(fd); return -1; }
         unsigned char resp[2];
-        if (recv(fd, resp, 2, 0) != 2 || resp[0] != 0x05 || resp[1] != 0x02) { close(fd); return -1; }
+        if (read_full(fd, resp, 2) != 0 || resp[0] != 0x05 || resp[1] != 0x02) { close(fd); return -1; }
         /* auth */
         size_t ulen = strlen(up->username), plen = strlen(up->password);
         unsigned char abuf[512];
@@ -142,12 +179,12 @@ int upstream_connect_socks5(const upstream_profile_t *up, const char *target_hos
         memcpy(abuf+3+ulen, up->password, plen);
         if (send(fd, abuf, 3+ulen+plen, 0) < 0) { close(fd); return -1; }
         unsigned char aresp[2];
-        if (recv(fd, aresp, 2, 0) != 2 || aresp[1] != 0x00) { close(fd); return -1; }
+        if (read_full(fd, aresp, 2) != 0 || aresp[1] != 0x00) { close(fd); return -1; }
     } else {
         unsigned char hello[3] = {0x05,0x01,0x00};
         if (send(fd, hello, 3, 0) != 3) { close(fd); return -1; }
         unsigned char resp[2];
-        if (recv(fd, resp, 2, 0) != 2 || resp[0] != 0x05 || resp[1] != 0x00) { close(fd); return -1; }
+        if (read_full(fd, resp, 2) != 0 || resp[0] != 0x05 || resp[1] != 0x00) { close(fd); return -1; }
     }
     /* CONNECT request */
     unsigned char req[512];
@@ -167,9 +204,20 @@ int upstream_connect_socks5(const upstream_profile_t *up, const char *target_hos
     req[pos++] = (unsigned char)(target_port >> 8);
     req[pos++] = (unsigned char)(target_port & 0xFF);
     if (send(fd, req, pos, 0) < 0) { close(fd); return -1; }
-    unsigned char r[256];
-    ssize_t rn = recv(fd, r, sizeof r, 0);
-    if (rn < 2 || r[1] != 0x00) { close(fd); return -1; }
+    /* 应答长度不定（ATYP 决定），先读 4 字节头再按需补齐 */
+    unsigned char r[4];
+    if (read_full(fd, r, 4) != 0 || r[1] != 0x00) { close(fd); return -1; }
+    size_t tail = (r[3] == 0x01) ? 4 + 2 : (r[3] == 0x04) ? 16 + 2 : (size_t)r[4 - 1];
+    if (r[3] == 0x03) {
+        unsigned char dlen = 0;
+        if (read_full(fd, &dlen, 1) != 0) { close(fd); return -1; }
+        tail = (size_t)dlen + 2;
+    }
+    if (tail > 0) {
+        unsigned char skip[300];
+        if (tail > sizeof skip || read_full(fd, skip, tail) != 0) { close(fd); return -1; }
+    }
+    set_io_timeout(fd, 0);
     *out_fd = fd;
     return 0;
 }
