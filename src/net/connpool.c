@@ -1,13 +1,11 @@
-/* 连接池：把阻塞的「DNS + connect + 上游握手」搬出事件循环。
+/* 任务池（连接池）：把阻塞的 DNS/connect/上游握手搬出事件循环。
  *
  * 结构：N 个工作线程从任务队列取活，干完把结果放到完成队列，再往 socketpair
  * 写一个字节唤醒事件循环；事件循环线程只负责在 pump 里回调调用方。
  * 跨线程只共享这两个队列和唤醒 fd，不需要给 event_base 开 evthread。
  */
 #include "rybaproxy/connpool.h"
-#include "rybaproxy/upstream.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -18,14 +16,13 @@
 
 #include <event2/event.h>
 
-#define CONNPOOL_HARD_MAX 32
+#define CONNPOOL_HARD_MAX 64
 
 typedef struct conn_job {
     struct conn_job *next;
     void *ctx;
-    upstream_profile_t up;
-    char host[256];
-    uint16_t port;
+    connpool_task_fn task;
+    void *task_ctx;
     connpool_done_fn done;
     void *ud;
     int fd;
@@ -43,14 +40,11 @@ static struct {
     int wake[2];           /* [0] 事件循环读，[1] 工作线程写 */
     struct event *wake_ev;
     struct event_base *base;
-    connpool_connect_fn connect_fn;
 } g_pool = {
     .mu = PTHREAD_MUTEX_INITIALIZER,
     .cv = PTHREAD_COND_INITIALIZER,
     .wake = {-1, -1},
 };
-
-/* ---------- 内部工具 ---------- */
 
 static void job_free(conn_job_t *j) {
     if (!j) return;
@@ -74,16 +68,16 @@ static void connpool_pump(evutil_socket_t fd, short what, void *arg) {
         list = j->next;
         j->next = NULL;
         if (j->canceled) {
-            /* 调用方已经走了：连上的 fd 由这里关掉，绝不回调 */
+            /* 调用方已经走了：任务产出的 fd 由这里关掉，绝不回调 */
             job_free(j);
             continue;
         }
         connpool_done_fn done = j->done;
         void *ctx = j->ctx, *ud = j->ud;
-        int jfd = j->fd, up_id = j->up.id;
+        int jfd = j->fd;
         j->fd = -1;
         free(j);
-        done(ctx, jfd, up_id, ud);
+        done(ctx, jfd, ud);
     }
 }
 
@@ -99,8 +93,7 @@ static void *worker_main(void *arg) {
         pthread_mutex_unlock(&g_pool.mu);
 
         int fd = -1;
-        connpool_connect_fn fn = g_pool.connect_fn ? g_pool.connect_fn : NULL;
-        if (!fn || fn(&j->up, j->host, j->port, &fd) != 0) {
+        if (!j->task || j->task(j->task_ctx, &fd) != 0) {
             if (fd >= 0) { close(fd); fd = -1; }
         }
         j->fd = fd;
@@ -122,16 +115,6 @@ static void *worker_main(void *arg) {
     return NULL;
 }
 
-/* 默认连接实现：direct / HTTP 代理 CONNECT / SOCKS5 */
-static int default_connect(const upstream_profile_t *up, const char *host,
-                           uint16_t port, int *out_fd) {
-    if (!up) return -1;
-    if (up->type == UPSTREAM_DIRECT) return upstream_connect_direct(host, port, out_fd);
-    if (up->type == UPSTREAM_HTTP) return upstream_connect_http(up, host, port, out_fd);
-    if (up->type == UPSTREAM_SOCKS5) return upstream_connect_socks5(up, host, port, out_fd);
-    return -1;
-}
-
 /* ---------- 对外接口 ---------- */
 
 int connpool_init(struct event_base *base, int workers) {
@@ -140,7 +123,6 @@ int connpool_init(struct event_base *base, int workers) {
     if (workers <= 0) workers = 8;
     if (workers > CONNPOOL_HARD_MAX) workers = CONNPOOL_HARD_MAX;
 
-    if (!g_pool.connect_fn) g_pool.connect_fn = default_connect;
     g_pool.base = base;
     g_pool.waiting = g_pool.finished = NULL;
 
@@ -172,7 +154,7 @@ void connpool_shutdown(void) {
     for (int i = 0; i < g_pool.workers; i++) pthread_join(g_pool.threads[i], NULL);
     g_pool.workers = 0;
 
-    /* 队列里剩下的任务：能关的关，能回调的丢弃（进程要退了） */
+    /* 队列里剩下的任务：能关的关，能丢的丢（进程要退了） */
     pthread_mutex_lock(&g_pool.mu);
     conn_job_t *l = g_pool.waiting;
     g_pool.waiting = NULL;
@@ -188,19 +170,16 @@ void connpool_shutdown(void) {
     g_pool.base = NULL;
 }
 
-void connpool_set_connect_fn(connpool_connect_fn fn) { g_pool.connect_fn = fn; }
-
-int connpool_submit(void *ctx, const upstream_profile_t *up, const char *host,
-                    uint16_t port, connpool_done_fn done, void *ud) {
-    if (!ctx || !up || !host || !host[0] || !done) return -1;
+int connpool_submit(void *ctx, connpool_task_fn task, void *task_ctx,
+                    connpool_done_fn done, void *ud) {
+    if (!ctx || !task || !done) return -1;
     if (!g_pool.running) return -1;
 
     conn_job_t *j = calloc(1, sizeof *j);
     if (!j) return -1;
     j->ctx = ctx;
-    j->up = *up;
-    snprintf(j->host, sizeof j->host, "%s", host);
-    j->port = port;
+    j->task = task;
+    j->task_ctx = task_ctx;
     j->done = done;
     j->ud = ud;
     j->fd = -1;

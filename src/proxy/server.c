@@ -35,6 +35,22 @@
  * 32 足够覆盖家用并发，同时保证黑洞连接不会耗尽。 */
 #define CONNPOOL_WORKERS 32
 
+struct conn_t;
+/* 「路由 + 建连」任务：整个跑在工作线程，避免 geo 判定里的 DNS 阻塞事件循环 */
+typedef struct route_connect {
+    server_ctx_t *srv;
+    char host[256];
+    uint16_t port;
+    protocol_t proto;
+    char client_ip[64];
+    /* --- 工作线程填的结果 --- */
+    router_match_t match;
+    upstream_profile_t up;
+    int have_up;
+    int fell_back;
+    long connect_ms;
+} route_connect_t;
+
 typedef struct {
     int headers_done;
     int is_connect;
@@ -53,13 +69,9 @@ typedef struct {
     int is_http;
     http_conn_t http;
     socks_conn_t socks;
-    /* 异步连接状态：期间事件循环不被阻塞，客户端断开则取消任务 */
+    /* 异步连接状态：路由判定（可能触发阻塞 DNS）与建连都在工作线程里做 */
     int connecting;
-    int fallback_tried;
-    upstream_profile_t up; /* 本次尝试的上游副本（配置数组可能被 web 线程改写） */
-    char target_host[256];
-    uint16_t target_port;
-    long conn_start_ms;
+    struct route_connect rc;
 } conn_t;
 
 static void set_nonblock(int fd) {
@@ -105,101 +117,143 @@ static upstream_profile_t *direct_upstream(server_ctx_t *srv) {
     return d;
 }
 
-/* 薄胶水：路由选择 + 上游落地 + 打一条决策日志。
- * 判定全在纯函数 router_select_ex / upstream_pick 里，这里只做副作用。 */
-static upstream_profile_t *pick_upstream_logged(conn_t *c, const char *host, uint16_t port,
-                                                protocol_t proto) {
-    server_ctx_t *srv = c->srv;
-    router_match_t m;
-    int route_id = router_select_ex(&srv->router, host, port, proto, c->session->client_ip, &m);
-    int idx = upstream_pick(srv->upstreams, srv->upstream_count,
-                            srv->config.default_upstream, route_id);
-    if (idx < 0) {
-        ensure_direct(srv);
-        idx = upstream_pick(srv->upstreams, srv->upstream_count,
-                            srv->config.default_upstream, route_id);
-    }
-    upstream_profile_t *up = idx < 0 ? NULL : &srv->upstreams[idx];
+/* 工作线程：路由判定（含 geo 查询/DNS）+ 建连 + 失败回落 direct。
+ * 这里绝不能碰事件循环对象；只读/加锁访问 srv 的规则与上游表。 */
+static int route_connect_task(void *arg, int *out_fd) {
+    route_connect_t *t = arg;
+    server_ctx_t *srv = t->srv;
 
-    /* 决策日志：以后翻日志能直接看出「这个域名为什么走了这条线」 */
-    reqlog_route_t r;
-    memset(&r, 0, sizeof r);
-    r.id = c->session->id;
-    r.client = c->session->client_ip;
-    r.host = host;
-    r.port = port;
-    r.proto = (proto == PROTO_SOCKS5) ? "SOCKS5" : "HTTP";
-    r.method = c->session->method[0] ? c->session->method : NULL;
-    r.rule_id = m.rule_id;
-    r.rule_name = m.rule_name;
-    r.upstream = up ? up->name : "(none)";
-    r.geo_site = m.geo_site;
-    r.geo_host = m.geo_host;
-    r.geo_lan = m.geo_lan;
-    char line[512];
-    reqlog_format_route(line, sizeof line, &r);
-    LOG_INFO("%s", line);
-    return up;
+    /* 先在锁内拍一份规则/上游快照，然后立刻放锁：
+     * geo 判定可能要发 DNS（几十 ms 到几秒），绝不能持锁做，否则工作线程会互相排队。 */
+    pthread_mutex_lock(&srv->lock);
+    int nrule = srv->router.count;
+    int nup = srv->upstream_count;
+    rule_t *rules = nrule > 0 ? malloc((size_t)nrule * sizeof *rules) : NULL;
+    upstream_profile_t *ups = nup > 0 ? malloc((size_t)nup * sizeof *ups) : NULL;
+    char defname[RYBA_NAME_MAX];
+    snprintf(defname, sizeof defname, "%s", srv->config.default_upstream);
+    if (rules && srv->router.rules) memcpy(rules, srv->router.rules, (size_t)nrule * sizeof *rules);
+    else nrule = 0;
+    if (ups && srv->upstreams) memcpy(ups, srv->upstreams, (size_t)nup * sizeof *ups);
+    else nup = 0;
+    pthread_mutex_unlock(&srv->lock);
+
+    router_t snapshot;
+    memset(&snapshot, 0, sizeof snapshot);
+    snapshot.rules = rules;
+    snapshot.count = nrule;
+    snapshot.cap = nrule;
+    snprintf(snapshot.default_upstream, sizeof snapshot.default_upstream, "%s", defname);
+
+    int route_id = router_select_ex(&snapshot, t->host, t->port, t->proto, t->client_ip, &t->match);
+    int idx = upstream_pick(ups, nup, defname, route_id);
+    if (idx >= 0) {
+        t->up = ups[idx];
+        t->have_up = 1;
+    }
+    /* 兜底：表里没有 direct 就造一个（与 ensure_direct 同语义，但不改共享表） */
+    upstream_profile_t synth_direct;
+    memset(&synth_direct, 0, sizeof synth_direct);
+    synth_direct.type = UPSTREAM_DIRECT;
+    synth_direct.enabled = 1;
+    snprintf(synth_direct.name, sizeof synth_direct.name, "direct");
+    if (!t->have_up && route_id < 0 && (nup == 0 || !ups)) {
+        synth_direct.id = 0;
+        t->up = synth_direct;
+        t->have_up = 1;
+    }
+    free(rules);
+    free(ups);
+
+    if (!t->have_up) return -1;
+
+    long t0 = now_ms();
+    int rc = upstream_connect_profile(&t->up, t->host, t->port, out_fd);
+    if (rc != 0 && srv->config.fallback_to_direct && t->up.type != UPSTREAM_DIRECT) {
+        upstream_profile_t fb = synth_direct;
+        fb.id = t->up.id;
+        if (upstream_connect_profile(&fb, t->host, t->port, out_fd) == 0) {
+            t->up = fb;
+            t->fell_back = 1;
+            rc = 0;
+        }
+    }
+    t->connect_ms = now_ms() - t0;
+    return rc;
 }
 
-/* ---------- 连接上游（异步，跑在 connpool 的线程里） ---------- */
+/* 事件循环线程：连上了再打日志、建 bufferevent、开始 relay */
+static void on_route_ready(void *ctx, int fd, void *ud);
 
 static void http_upstream_ready(conn_t *c, int fd);
 static void socks_upstream_ready(conn_t *c, int fd);
 static void http_respond_error(conn_t *c, int status, const char *reason);
 static void socks_respond_failure(conn_t *c);
 
-static void on_upstream_ready(void *ctx, int fd, int upstream_id, void *ud);
+static void log_route_decision(conn_t *c, const route_connect_t *t) {
+    reqlog_route_t r;
+    memset(&r, 0, sizeof r);
+    r.id = c->session->id;
+    r.client = t->client_ip;
+    r.host = t->host;
+    r.port = t->port;
+    r.proto = (t->proto == PROTO_SOCKS5) ? "SOCKS5" : "HTTP";
+    r.method = c->session->method[0] ? c->session->method : NULL;
+    r.rule_id = t->match.rule_id;
+    r.rule_name = t->match.rule_name;
+    r.upstream = t->have_up ? t->up.name : "(none)";
+    r.geo_site = t->match.geo_site;
+    r.geo_host = t->match.geo_host;
+    r.geo_lan = t->match.geo_lan;
+    char line[512];
+    reqlog_format_route(line, sizeof line, &r);
+    LOG_INFO("%s", line);
+}
 
-static void begin_connect(conn_t *c, upstream_profile_t *up) {
-    c->up = *up;
-    c->session->upstream_id = up->id;
+static void begin_route(conn_t *c, const char *host, uint16_t port, protocol_t proto) {
+    route_connect_t *t = &c->rc;
+    memset(t, 0, sizeof *t);
+    t->srv = c->srv;
+    snprintf(t->host, sizeof t->host, "%s", host);
+    t->port = port;
+    t->proto = proto;
+    snprintf(t->client_ip, sizeof t->client_ip, "%s", c->session->client_ip);
     c->connecting = 1;
-    c->conn_start_ms = now_ms();
-    if (connpool_submit(c, &c->up, c->target_host, c->target_port,
-                        on_upstream_ready, c) != 0) {
+    if (connpool_submit(c, route_connect_task, t, on_route_ready, c) != 0) {
         c->connecting = 0;
         if (c->is_http) http_respond_error(c, 502, "pool_unavailable");
         else socks_respond_failure(c);
-        return;
     }
 }
 
-static void on_upstream_ready(void *ctx, int fd, int upstream_id, void *ud) {
+static void on_route_ready(void *ctx, int fd, void *ud) {
     (void)ud;
     conn_t *c = ctx;
-    server_ctx_t *srv = c->srv;
+    route_connect_t *t = &c->rc;
     c->connecting = 0;
-    long ms = now_ms() - c->conn_start_ms;
 
+    log_route_decision(c, t);
     char line[256];
-    reqlog_format_connect(line, sizeof line, c->session->id, c->up.name, fd >= 0, ms,
-                          fd >= 0 ? NULL : (ms >= srv->config.connect_timeout_sec * 1000L
-                                            ? "timeout" : "connect_failed"));
+    reqlog_format_connect(line, sizeof line, c->session->id,
+                          t->have_up ? t->up.name : "-", fd >= 0, t->connect_ms,
+                          fd >= 0 ? NULL : "connect_failed");
     LOG_DEBUG("%s", line);
+    if (t->fell_back)
+        LOG_WARN("[%llu] 上游连接失败，已回落 direct 成功",
+                 (unsigned long long)c->session->id);
+    if (t->have_up) c->session->upstream_id = t->up.id;
 
     if (fd < 0) {
-        if (srv->config.fallback_to_direct && c->up.type != UPSTREAM_DIRECT && !c->fallback_tried) {
-            upstream_profile_t *fb = direct_upstream(srv);
-            if (fb) {
-                c->fallback_tried = 1;
-                LOG_WARN("[%llu] 上游 %s 连接失败，回落 direct 重试",
-                         (unsigned long long)c->session->id, c->up.name);
-                begin_connect(c, fb);
-                return;
-            }
-        }
-        if (c->is_http) http_respond_error(c, 502, "connect_failed");
+        if (c->is_http) http_respond_error(c, 502, t->have_up ? "connect_failed" : "no_upstream");
         else socks_respond_failure(c);
         return;
     }
-    if (upstream_id != c->up.id) c->session->upstream_id = upstream_id;
     set_nonblock(fd);
     if (c->is_http) http_upstream_ready(c, fd);
     else socks_upstream_ready(c, fd);
 }
 
-/* 客户端在上游连接期间就断了：取消任务（池子会关掉已连上的 fd） */
+/* 客户端在任务在飞时断开：取消（池子会关掉任务产出的 fd） */
 static void cancel_pending_connect(conn_t *c) {
     if (c->connecting) {
         connpool_cancel(c);
@@ -262,7 +316,7 @@ static void http_respond_error(conn_t *c, int status, const char *reason) {
     if (c->session)
         LOG_WARN("[%llu] 失败 host=%s:%u upstream=%s reason=%s -> %d",
                  (unsigned long long)c->session->id, c->session->target_host,
-                 (unsigned)c->session->target_port, c->up.name[0] ? c->up.name : "-",
+                 (unsigned)c->session->target_port, c->rc.have_up ? c->rc.up.name : "-",
                  reason ? reason : "-", status);
     const char *resp = NULL;
     for (size_t i = 0; i < sizeof kResponses / sizeof kResponses[0]; i++)
@@ -385,16 +439,9 @@ static void http_read_cb(struct bufferevent *bev, void *arg) {
         }
     }
 
-    upstream_profile_t *up = pick_upstream_logged(c, info.host, info.port, PROTO_HTTP);
-    if (!up) {
-        http_respond_error(c, 502, "no_upstream");
-        return;
-    }
-    snprintf(c->target_host, sizeof c->target_host, "%s", info.host);
-    c->target_port = info.port;
     /* 连上游期间不读客户端：数据留在内核缓冲，形成天然背压 */
     bufferevent_disable(bev, EV_READ);
-    begin_connect(c, up);
+    begin_route(c, info.host, info.port, PROTO_HTTP);
 }
 
 static void http_event_cb(struct bufferevent *bev, short events, void *arg) {
@@ -419,7 +466,7 @@ static void socks_respond_failure(conn_t *c) {
     if (c->session)
         LOG_WARN("[%llu] 失败 host=%s:%u upstream=%s reason=socks5_upstream_failed",
                  (unsigned long long)c->session->id, c->session->target_host,
-                 (unsigned)c->session->target_port, c->up.name[0] ? c->up.name : "-");
+                 (unsigned)c->session->target_port, c->rc.have_up ? c->rc.up.name : "-");
     http_finish(c, 0);
 }
 
@@ -536,17 +583,9 @@ static void socks_read_cb(struct bufferevent *bev, void *arg) {
         session_set_target(s, host, port);
         snprintf(s->method, sizeof s->method, "SOCKS5-CONNECT");
 
-        upstream_profile_t *up = pick_upstream_logged(c, host, port, PROTO_SOCKS5);
-        if (!up) {
-            free(data);
-            socks_respond_failure(c);
-            return;
-        }
-        snprintf(c->target_host, sizeof c->target_host, "%s", host);
-        c->target_port = port;
         bufferevent_disable(bev, EV_READ);
         free(data);
-        begin_connect(c, up);
+        begin_route(c, host, port, PROTO_SOCKS5);
         return;
     }
 

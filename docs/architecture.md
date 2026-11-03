@@ -159,8 +159,10 @@ typedef struct rule {
 ## 5. 并发与线程
 
 - **主线程**：libevent 循环（accept、IO、超时、事件泵），**不做任何阻塞调用**。
-- **连接线程池**（`src/net/connpool.c`，默认 32 线程）：执行 DNS 解析、TCP connect、
-  HTTP `CONNECT` / SOCKS5 握手这些阻塞动作；干完把 fd 通过 socketpair 交回主线程。
+- **连接线程池**（`src/net/connpool.c`，默认 32 线程）：执行**路由判定 + 建连**整段阻塞活
+  ——geo 判定里的 DNS 解析（`geo_host_is_cn` → `getaddrinfo`）、TCP connect、
+  HTTP `CONNECT` / SOCKS5 握手；干完把 fd 通过 socketpair 交回主线程。
+  规则/上游表在锁内**拷贝快照**后立刻放锁，DNS 不持锁（否则工作线程会互相排队）。
   > 为什么必须有它：这些调用原先直接跑在事件循环里，一个慢连接会把所有并发请求串行卡住
   > （实测 10 个 3s 的坏目标能让无关请求排队 15s）。
 - **统计写入线程**：从队列取会话事件，批量事务写入 SQLite。
